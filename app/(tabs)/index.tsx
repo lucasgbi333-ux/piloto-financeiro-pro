@@ -1,7 +1,10 @@
-import { ScrollView, Text, View, StyleSheet } from "react-native";
+import { ScrollView, Text, View, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
+import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import * as Haptics from "expo-haptics";
 import type { DailyRecord } from "@/lib/types";
 
 function fmt(val: number): string {
@@ -119,10 +122,32 @@ function ProfileDashCard({
 
 export default function DashboardScreen() {
   const { state } = useApp();
+  const { signOut, user } = useSupabaseAuth();
   const {
     dashboard, fixedCostResult, operationalResult,
     dailyRecords, dailyRecordsCombustao, dailyRecordsEletrico, caixinha,
   } = state;
+
+  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Motorista";
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Sair da conta",
+      "Tem certeza que deseja sair?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: async () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await signOut();
+            router.replace("/login");
+          },
+        },
+      ]
+    );
+  };
 
   const custoPorKmTotal = operationalResult.custoPorKmTotal;
 
@@ -141,8 +166,23 @@ export default function DashboardScreen() {
     <ScreenContainer>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.greeting}>Piloto Financeiro</Text>
-          <Text style={styles.subtitleAccent}>Pro</Text>
+          <View style={styles.headerTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>Olá, {userName}</Text>
+              <View style={styles.brandRow}>
+                <Text style={styles.brandText}>Piloto Financeiro</Text>
+                <Text style={styles.subtitleAccent}> Pro</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="logout" size={20} color="#FF453A" />
+              <Text style={styles.logoutText}>Sair</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {!hasData && (
@@ -268,9 +308,19 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: "row", alignItems: "baseline", marginBottom: 28, gap: 8 },
-  greeting: { color: "#FFFFFF", fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
-  subtitleAccent: { color: "#00D4AA", fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
+  header: { marginBottom: 28 },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  greeting: { color: "#9BA1A6", fontSize: 14, fontWeight: "500", marginBottom: 2 },
+  brandRow: { flexDirection: "row", alignItems: "baseline" },
+  brandText: { color: "#FFFFFF", fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
+  subtitleAccent: { color: "#00D4AA", fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
+  logoutBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(255,69,58,0.1)", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: "rgba(255,69,58,0.2)",
+  },
+  logoutText: { color: "#FF453A", fontSize: 13, fontWeight: "600" },
   onboardingCard: {
     backgroundColor: "#111111", borderRadius: 16, padding: 20,
     marginBottom: 20, borderWidth: 1, borderColor: "#1C1C1E",

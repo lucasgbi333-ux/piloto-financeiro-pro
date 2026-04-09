@@ -97,3 +97,4 @@
 - [x] Design moderno e minimalista com feedback visual (loading)
 - [x] Corrigir problema de cadastro no Supabase Auth
 - [x] Adicionar campo nome completo na tela de cadastro
+- [x] Botão de Logout no Dashboard para sair e voltar à tela de login
