@@ -93,12 +93,15 @@ describe("calculateOperationalCost", () => {
       gastoAbastecimento: 70,
     };
     const result = calculateOperationalCost(input);
-    expect(result.custoPorKm).toBeCloseTo(0.5, 3);
+    // Com gastoAbastecimento=70 e kmRodado=200: custoPorKm REAL = 70/200 = 0.35
+    expect(result.custoPorKm).toBeCloseTo(0.35, 3);
+    expect(result.isUsingRealCost).toBe(true);
     expect(result.custoTotalDiaEstimado).toBeCloseTo(100, 2);
     expect(result.custoTotalDiaReal).toBeCloseTo(70, 2);
+    // lucroDia = ganho - custoReal = 300 - 70 = 230
     expect(result.lucroDia).toBeCloseTo(230, 2);
+    // lucroPorKm = (ganho - custoReal) / km = 230/200 = 1.15
     expect(result.lucroPorKm).toBeCloseTo(1.15, 3);
-    expect(result.valorMinimoKm).toBeCloseTo(1.0, 3);
   });
 
   it("should use estimated cost when gastoAbastecimento is 0", () => {

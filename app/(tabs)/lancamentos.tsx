@@ -48,6 +48,7 @@ export default function LancamentosScreen() {
   const [ganho, setGanho] = useState(0);
   const [margemDesejada, setMargemDesejada] = useState(state.operationalInput.margemDesejadaPorKm);
   const [gastoAbastecimento, setGastoAbastecimento] = useState(0);
+  const [valorMinimoKm, setValorMinimoKm] = useState(state.operationalInput.margemDesejadaPorKm);
 
   // Modal de detalhe do dia
   const [detailDate, setDetailDate] = useState<string | null>(null);
@@ -101,6 +102,7 @@ export default function LancamentosScreen() {
       setGanho(op.ganhoDia > 0 ? op.ganhoDia : 0);
       setMargemDesejada(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
       setGastoAbastecimento(op.gastoAbastecimento > 0 ? op.gastoAbastecimento : 0);
+      setValorMinimoKm(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
     }
     setModalVisible(true);
   };
@@ -342,6 +344,13 @@ export default function LancamentosScreen() {
                 placeholder="0,00"
                 suffix="R$/km"
               />
+              <InputField
+                label="Valor Mínimo por KM"
+                value={valorMinimoKm}
+                onChangeValue={setValorMinimoKm}
+                placeholder="0,00"
+                suffix="R$/km"
+              />
 
               {/* Abastecimento */}
               <View style={styles.fuelSection}>
@@ -381,6 +390,14 @@ export default function LancamentosScreen() {
                       R$ {modalResult.custoPorKm.toFixed(3).replace(".", ",")}
                     </Text>
                   </View>
+                  {valorMinimoKm > 0 && (
+                    <View style={styles.previewRow}>
+                      <Text style={styles.previewLabel}>Mínimo por KM</Text>
+                      <Text style={[styles.previewValue, { color: "#00D4AA" }]}>
+                        R$ {valorMinimoKm.toFixed(3).replace(".", ",")}/km
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.previewRow}>
                     <Text style={styles.previewLabel}>Custo do Dia</Text>
                     <Text style={[styles.previewValue, { color: "#FF453A" }]}>

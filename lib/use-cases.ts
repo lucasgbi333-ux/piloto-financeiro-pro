@@ -72,26 +72,33 @@ export function calculateOperationalCost(
   const autonomia = input.autonomia > 0 ? input.autonomia : (profile?.autonomia ?? 0);
   const margem = input.margemDesejadaPorKm > 0 ? input.margemDesejadaPorKm : (profile?.margemDesejada ?? 0);
 
+  /**
+   * REGRA DE PRIORIDADE:
+   * SE gastoAbastecimento > 0 E kmRodadoDia > 0 → usar cálculo REAL
+   * CASO CONTRÁRIO → usar cálculo ESTIMADO (preco / autonomia)
+   */
+  const isUsingRealCost = input.gastoAbastecimento > 0 && input.kmRodadoDia > 0;
+
   // Custo de combustível por km
-  const custoPorKm = autonomia > 0 ? preco / autonomia : 0;
+  const custoPorKmEstimado = autonomia > 0 ? preco / autonomia : 0;
+  const custoPorKmReal = isUsingRealCost ? input.gastoAbastecimento / input.kmRodadoDia : 0;
+  const custoPorKm = isUsingRealCost ? custoPorKmReal : custoPorKmEstimado;
 
   // Custo fixo por km (fixos do dia ÷ km rodados)
   const custoFixoPorKm = input.kmRodadoDia > 0 ? custoFixoDiario / input.kmRodadoDia : 0;
 
-  // Custo total por km = combustível + fixos
+  // Custo total por km = combustível/recarga + fixos
   const custoPorKmTotal = custoPorKm + custoFixoPorKm;
 
-  const custoTotalDiaEstimado = custoPorKm * input.kmRodadoDia;
+  const custoTotalDiaEstimado = custoPorKmEstimado * input.kmRodadoDia;
 
-  const custoTotalDiaReal =
-    input.gastoAbastecimento > 0
-      ? input.gastoAbastecimento
-      : custoTotalDiaEstimado;
+  // Custo real do dia: usa gasto real se informado, senão usa estimado
+  const custoTotalDiaReal = isUsingRealCost ? input.gastoAbastecimento : custoTotalDiaEstimado;
 
   // Lucro bruto (sem descontar fixos)
   const lucroDia = input.ganhoDia - custoTotalDiaReal;
 
-  // Lucro líquido = ganho - custo combustível - custo fixo diário
+  // Lucro líquido = ganho - custo combustível/recarga - custo fixo diário
   const lucroDiaLiquido = input.ganhoDia - custoTotalDiaReal - custoFixoDiario;
 
   const lucroPorKm = input.kmRodadoDia > 0 ? lucroDiaLiquido / input.kmRodadoDia : 0;
@@ -106,6 +113,7 @@ export function calculateOperationalCost(
     lucroDia,
     lucroDiaLiquido,
     valorMinimoKm,
+    isUsingRealCost,
   };
 }
 

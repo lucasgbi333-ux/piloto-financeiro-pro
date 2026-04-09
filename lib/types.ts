@@ -65,6 +65,8 @@ export interface OperationalResult {
   lucroDiaLiquido: number;
   lucroDia: number;
   valorMinimoKm: number;
+  /** true quando o cálculo usa gastoAbastecimento real (não estimado) */
+  isUsingRealCost: boolean;
 }
 
 // ===== REGISTRO DIÁRIO (aprimorado) =====

@@ -72,3 +72,6 @@
 - [x] Expandir modal de Lançamentos com todos os campos do Operacional
 - [x] Perfis separados Combustão/Elétrico no Operacional (campos independentes por tipo)
 - [x] Corrigir rótulo "Combust./Recarga" no Histórico (combustível ou recarga elétrica)
+- [x] Operacional: remover custo/km estimado, exibir apenas custo/km real com fallback automático
+- [x] Operacional Elétrico: cálculo REAL automático quando valorRecarregado > 0 e kmRodado > 0
+- [x] Lançamentos: adicionar campo valor mínimo por km no modal

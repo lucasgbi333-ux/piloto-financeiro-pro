@@ -40,7 +40,8 @@ export default function OperationalScreen() {
     setResetKey((k) => k + 1);
   };
 
-  const usingRealCost = input.gastoAbastecimento > 0;
+  // Usa isUsingRealCost do use-case (real = gastoAbastecimento > 0 E kmRodadoDia > 0)
+  const usingRealCost = result.isUsingRealCost;
 
   const handleClear = () => {
     Alert.alert(
@@ -170,13 +171,13 @@ export default function OperationalScreen() {
           {usingRealCost ? (
             <View style={styles.fuelNoteReal}>
               <Text style={styles.fuelNoteRealText}>
-                ✓ Usando custo real: {fmt(input.gastoAbastecimento)}
+                ✓ Usando custo real baseado na sua {input.tipoVeiculo === "COMBUSTAO" ? "recarga" : "recarga elétrica"}
               </Text>
             </View>
           ) : (
             <View style={styles.fuelNoteEstimated}>
               <Text style={styles.fuelNoteEstimatedText}>
-                ℹ Usando custo estimado: {fmt(result.custoTotalDiaEstimado)}
+                ℹ Usando estimativa — adicione {input.tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga"} para maior precisão
               </Text>
             </View>
           )}
@@ -185,13 +186,20 @@ export default function OperationalScreen() {
         {/* Resultados */}
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Resultados</Text>
+
+          {/* Custo por KM — exibe apenas o custo real quando disponível, senão estimado */}
           <ResultCard
             icon="speed"
-            title="Custo por KM (estimado)"
+            title={usingRealCost ? "Custo por KM (Real)" : "Custo por KM (Estimado)"}
             value={fmtKm(result.custoPorKm)}
-            subtitle="Baseado no preço e autonomia"
-            accentColor="#FF9500"
+            subtitle={
+              usingRealCost
+                ? `Baseado no gasto real: ${fmt(input.gastoAbastecimento)}`
+                : `Adicione ${input.tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga"} para custo real`
+            }
+            accentColor={usingRealCost ? "#00D4AA" : "#FF9500"}
           />
+
           <ResultCard
             icon="local-gas-station"
             title={usingRealCost ? "Custo Real do Dia" : "Custo Estimado do Dia"}
@@ -209,9 +217,9 @@ export default function OperationalScreen() {
           <ResultCard
             icon="account-balance-wallet"
             title="Lucro Líquido do Dia"
-            value={fmt(result.lucroDia)}
-            subtitle={`Ganho ${fmt(input.ganhoDia)} − Custo ${fmt(result.custoTotalDiaReal)}`}
-            accentColor={result.lucroDia >= 0 ? "#30D158" : "#FF453A"}
+            value={fmt(result.lucroDiaLiquido)}
+            subtitle={`Ganho ${fmt(input.ganhoDia)} − Custo ${fmt(result.custoTotalDiaReal)} − Fixos ${fmt(state.fixedCostResult.custoFixoDiario)}`}
+            accentColor={result.lucroDiaLiquido >= 0 ? "#30D158" : "#FF453A"}
           />
           <ResultCard
             icon="verified"
