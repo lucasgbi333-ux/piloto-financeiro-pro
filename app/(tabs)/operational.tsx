@@ -21,7 +21,8 @@ export default function OperationalScreen() {
   const { state, setOperational, setActiveVehicleType, recordDayWithTransactions, resetOperational } = useApp();
   const { operationalInput: input, operationalResult: result, activeProfile } = state;
 
-  // Data editável para o registro
+  // resetKey força remount de todos os InputField quando Limpar é acionado
+  const [resetKey, setResetKey] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const vehicleOptions: VehicleType[] = ["COMBUSTAO", "ELETRICO"];
@@ -33,7 +34,6 @@ export default function OperationalScreen() {
 
   const handleSwitchVehicle = (i: number) => {
     const newType = vehicleOptions[i];
-    // Atualiza perfil ativo e preenche campos do perfil salvo
     setActiveVehicleType(newType);
     setOperational({
       ...input,
@@ -58,6 +58,8 @@ export default function OperationalScreen() {
           onPress: () => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             resetOperational();
+            // Incrementar resetKey força todos os InputField a remontarem com value=0
+            setResetKey((k) => k + 1);
             setSelectedDate(new Date().toISOString().split("T")[0]);
           },
         },
@@ -108,8 +110,8 @@ export default function OperationalScreen() {
           </View>
         )}
 
-        {/* Inputs de energia */}
-        <View style={styles.section}>
+        {/* Inputs de energia — resetKey força remount ao limpar */}
+        <View style={styles.section} key={`energy-${resetKey}`}>
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (L)" : "Preço kWh"}
             value={input.precoCombustivel}
@@ -126,8 +128,8 @@ export default function OperationalScreen() {
           />
         </View>
 
-        {/* Dados do dia */}
-        <View style={styles.section}>
+        {/* Dados do dia — resetKey força remount ao limpar */}
+        <View style={styles.section} key={`day-${resetKey}`}>
           <Text style={styles.sectionLabel}>Dados do Dia</Text>
           <InputField
             label="KM Rodados"
@@ -152,8 +154,8 @@ export default function OperationalScreen() {
           />
         </View>
 
-        {/* Abastecimento real */}
-        <View style={styles.fuelSection}>
+        {/* Abastecimento real — resetKey força remount ao limpar */}
+        <View style={styles.fuelSection} key={`fuel-${resetKey}`}>
           <Text style={styles.fuelTitle}>
             {input.tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
           </Text>
@@ -232,7 +234,6 @@ export default function OperationalScreen() {
               style={styles.dateInput}
               value={selectedDate}
               onChangeText={(t: string) => {
-                // Aceita formato AAAA-MM-DD
                 const cleaned = t.replace(/[^0-9-]/g, "").slice(0, 10);
                 setSelectedDate(cleaned);
               }}

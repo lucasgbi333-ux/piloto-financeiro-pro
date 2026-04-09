@@ -62,3 +62,8 @@
 - [x] Adicionar botão Limpar na aba Operacional com confirmação
 - [x] Ao limpar Operacional, zerar campos do dia e atualizar Dashboard
 - [x] Corrigir botão Limpar da aba Operacional: campos não zeram visualmente na tela
+- [x] Corrigir bug do Limpar definitivamente com key-based remount
+- [x] Pré-preencher modal de Lançamentos com dados do Operacional
+- [x] Criar aba Caixinha com 5% manutenção + 5% reserva automáticos
+- [x] Atualizar Dashboard com descontos da Caixinha no lucro líquido
+- [x] Atualizar Histórico com descontos da Caixinha

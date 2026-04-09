@@ -18,6 +18,8 @@ import type {
   ReportItem,
   PeriodFilter,
   DashboardState,
+  CaixinhaEntry,
+  CaixinhaState,
 } from "./types";
 import {
   calculateFixedCosts,
@@ -43,6 +45,42 @@ import {
   saveActiveVehicleType,
   loadActiveVehicleType,
 } from "./storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const CAIXINHA_KEY = "@pfp:caixinha_entries";
+
+async function saveCaixinhaEntries(entries: CaixinhaEntry[]): Promise<void> {
+  await AsyncStorage.setItem(CAIXINHA_KEY, JSON.stringify(entries));
+}
+
+async function loadCaixinhaEntries(): Promise<CaixinhaEntry[]> {
+  const raw = await AsyncStorage.getItem(CAIXINHA_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function buildCaixinhaState(entries: CaixinhaEntry[]): CaixinhaState {
+  const saldoManutencao = entries.reduce((s, e) => s + e.manutencao, 0);
+  const saldoReserva = entries.reduce((s, e) => s + e.reserva, 0);
+  return {
+    entries,
+    saldoManutencao,
+    saldoReserva,
+    saldoTotal: saldoManutencao + saldoReserva,
+  };
+}
+
+function createCaixinhaEntry(record: DailyRecord): CaixinhaEntry {
+  const manutencao = record.ganho * 0.05;
+  const reserva = record.ganho * 0.05;
+  return {
+    id: `caixinha-${record.date}-${Date.now()}`,
+    date: record.date,
+    ganhoBase: record.ganho,
+    manutencao,
+    reserva,
+    total: manutencao + reserva,
+  };
+}
 
 // ===== STATE =====
 interface AppState {
@@ -58,6 +96,7 @@ interface AppState {
   periodFilter: PeriodFilter;
   reports: ReportItem[];
   dashboard: DashboardState;
+  caixinha: CaixinhaState;
   loaded: boolean;
 }
 
@@ -88,13 +127,19 @@ function getActiveProfile(profiles: VehicleProfile[], type: VehicleType): Vehicl
 
 function computeDashboard(
   fixedResult: FixedCostResult,
-  opResult: OperationalResult
+  opResult: OperationalResult,
+  caixinha: CaixinhaState,
+  lastRecord?: DailyRecord
 ): DashboardState {
+  // Desconto da caixinha do último dia (10% do ganho bruto)
+  const caixinhaDesconto = lastRecord ? lastRecord.ganho * 0.10 : 0;
+  const lucroDiaLiquidoComCaixinha = opResult.lucroDiaLiquido - caixinhaDesconto;
   return {
     minPerKm: opResult.valorMinimoKm,
     requiredDaily: fixedResult.custoDiarioNecessario,
-    // Lucro líquido já descontando os custos fixos diluídos do dia
     dailyProfit: opResult.lucroDiaLiquido,
+    caixinhaDesconto,
+    lucroDiaLiquidoComCaixinha,
   };
 }
 
@@ -107,6 +152,7 @@ function buildInitialState(): AppState {
   const activeType: VehicleType = "COMBUSTAO";
   const activeProfile = getActiveProfile(defaultProfiles, activeType);
   const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile, fixedResult.custoFixoDiario);
+  const caixinha = buildCaixinhaState([]);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
@@ -119,7 +165,8 @@ function buildInitialState(): AppState {
     transactions: [],
     periodFilter: "DAY",
     reports: [],
-    dashboard: computeDashboard(fixedResult, opResult),
+    dashboard: computeDashboard(fixedResult, opResult, caixinha),
+    caixinha,
     loaded: false,
   };
 }
@@ -134,6 +181,7 @@ type Action =
       transactions: Transaction[];
       vehicleProfiles: VehicleProfile[];
       activeVehicleType: VehicleType;
+      caixinhaEntries: CaixinhaEntry[];
     }
   | { type: "SET_FIXED_COSTS"; input: FixedCostInput }
   | { type: "SET_OPERATIONAL"; input: OperationalInput }
@@ -143,7 +191,9 @@ type Action =
   | { type: "DELETE_DAILY_RECORD"; date: string }
   | { type: "ADD_TRANSACTION"; transaction: Transaction }
   | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter }
-  | { type: "RESET_OPERATIONAL" };
+  | { type: "RESET_OPERATIONAL" }
+  | { type: "ADD_CAIXINHA_ENTRY"; entry: CaixinhaEntry }
+  | { type: "DELETE_CAIXINHA_ENTRY"; date: string };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -158,6 +208,8 @@ function reducer(state: AppState, action: Action): AppState {
       const activeProfile = getActiveProfile(profiles, activeType);
       const or2 = calculateOperationalCost(oi, activeProfile, fr.custoFixoDiario);
       const recs = action.records;
+      const caixinha = buildCaixinhaState(action.caixinhaEntries);
+      const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
         ...state,
         fixedCostInput: fi,
@@ -169,29 +221,32 @@ function reducer(state: AppState, action: Action): AppState {
         activeProfile,
         dailyRecords: recs,
         transactions: action.transactions,
-        reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
-        dashboard: computeDashboard(fr, or2),
+        reports: groupReports(recs, state.periodFilter, fr.custoFixoDiario),
+        dashboard: computeDashboard(fr, or2, caixinha, lastRecord),
+        caixinha,
         loaded: true,
       };
     }
     case "SET_FIXED_COSTS": {
       const fr = calculateFixedCosts(action.input);
       const or2 = calculateOperationalCost(state.operationalInput, state.activeProfile, fr.custoFixoDiario);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         fixedCostInput: action.input,
         fixedCostResult: fr,
         operationalResult: or2,
-        dashboard: computeDashboard(fr, or2),
+        dashboard: computeDashboard(fr, or2, state.caixinha, lastRecord),
       };
     }
     case "SET_OPERATIONAL": {
       const or2 = calculateOperationalCost(action.input, state.activeProfile, state.fixedCostResult.custoFixoDiario);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         operationalInput: action.input,
         operationalResult: or2,
-        dashboard: computeDashboard(state.fixedCostResult, or2),
+        dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
     }
     case "SET_ACTIVE_VEHICLE_TYPE": {
@@ -201,13 +256,14 @@ function reducer(state: AppState, action: Action): AppState {
         activeProfile,
         state.fixedCostResult.custoFixoDiario
       );
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         activeVehicleType: action.vehicleType,
         activeProfile,
         operationalInput: { ...state.operationalInput, tipoVeiculo: action.vehicleType },
         operationalResult: or2,
-        dashboard: computeDashboard(state.fixedCostResult, or2),
+        dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
     }
     case "SAVE_VEHICLE_PROFILE": {
@@ -220,12 +276,13 @@ function reducer(state: AppState, action: Action): AppState {
       }
       const activeProfile = getActiveProfile(profiles, state.activeVehicleType);
       const or2 = calculateOperationalCost(state.operationalInput, activeProfile, state.fixedCostResult.custoFixoDiario);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         vehicleProfiles: profiles,
         activeProfile,
         operationalResult: or2,
-        dashboard: computeDashboard(state.fixedCostResult, or2),
+        dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
     }
     case "ADD_DAILY_RECORD": {
@@ -236,18 +293,27 @@ function reducer(state: AppState, action: Action): AppState {
       } else {
         recs.push(action.record);
       }
+      // O último registro define o desconto da caixinha no dashboard
+      const lastRecord = recs[recs.length - 1];
       return {
         ...state,
         dailyRecords: recs,
         reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, state.caixinha, lastRecord),
       };
     }
     case "DELETE_DAILY_RECORD": {
       const recs = state.dailyRecords.filter((r) => r.date !== action.date);
+      // Remove entrada da caixinha do mesmo dia
+      const newEntries = state.caixinha.entries.filter((e) => e.date !== action.date);
+      const newCaixinha = buildCaixinhaState(newEntries);
+      const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
         ...state,
         dailyRecords: recs,
+        caixinha: newCaixinha,
         reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, newCaixinha, lastRecord),
       };
     }
     case "ADD_TRANSACTION": {
@@ -264,14 +330,41 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case "RESET_OPERATIONAL": {
-      // Reseta os campos do dia operacional preservando o tipo de veículo ativo
       const resetInput = { ...defaultOperationalInput, tipoVeiculo: state.operationalInput.tipoVeiculo };
       const or2 = calculateOperationalCost(resetInput, state.activeProfile, state.fixedCostResult.custoFixoDiario);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         operationalInput: resetInput,
         operationalResult: or2,
-        dashboard: computeDashboard(state.fixedCostResult, or2),
+        dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
+      };
+    }
+    case "ADD_CAIXINHA_ENTRY": {
+      const entries = [...state.caixinha.entries];
+      // Upsert por data
+      const idx = entries.findIndex((e) => e.date === action.entry.date);
+      if (idx >= 0) {
+        entries[idx] = action.entry;
+      } else {
+        entries.push(action.entry);
+      }
+      const newCaixinha = buildCaixinhaState(entries);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
+      return {
+        ...state,
+        caixinha: newCaixinha,
+        dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, newCaixinha, lastRecord),
+      };
+    }
+    case "DELETE_CAIXINHA_ENTRY": {
+      const entries = state.caixinha.entries.filter((e) => e.date !== action.date);
+      const newCaixinha = buildCaixinhaState(entries);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
+      return {
+        ...state,
+        caixinha: newCaixinha,
+        dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, newCaixinha, lastRecord),
       };
     }
     default:
@@ -292,6 +385,7 @@ interface AppContextValue {
   addTransaction: (tx: Transaction) => void;
   setPeriodFilter: (filter: PeriodFilter) => void;
   recordDayWithTransactions: (record: DailyRecord) => void;
+  deleteCaixinhaEntry: (date: string) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -301,13 +395,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [fi, oi, recs, txs, profiles, activeType] = await Promise.all([
+      const [fi, oi, recs, txs, profiles, activeType, caixinhaEntries] = await Promise.all([
         loadFixedCosts(),
         loadOperational(),
         loadDailyRecords(),
         loadTransactions(),
         loadVehicleProfiles(),
         loadActiveVehicleType(),
+        loadCaixinhaEntries(),
       ]);
       dispatch({
         type: "LOAD_ALL",
@@ -317,6 +412,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         transactions: txs,
         vehicleProfiles: profiles,
         activeVehicleType: activeType,
+        caixinhaEntries,
       });
     })();
   }, []);
@@ -337,8 +433,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const resetOperational = useCallback(() => {
     dispatch({ type: "RESET_OPERATIONAL" });
-    // Persiste com tipoVeiculo atual (o reducer já preserva, mas salvamos após dispatch)
-    // Usamos um timeout mínimo para pegar o estado atualizado
     saveOperational({ ...defaultOperationalInput });
   }, []);
 
@@ -360,6 +454,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeDailyRecord = useCallback((date: string) => {
     dispatch({ type: "DELETE_DAILY_RECORD", date });
     deleteDailyRecord(date);
+    // Remove entrada da caixinha do mesmo dia e persiste
+    loadCaixinhaEntries().then((entries) => {
+      const updated = entries.filter((e) => e.date !== date);
+      saveCaixinhaEntries(updated);
+    });
   }, []);
 
   const addTransaction = useCallback((tx: Transaction) => {
@@ -380,6 +479,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "ADD_TRANSACTION", transaction: custoTx });
     saveTransaction(ganhoTx);
     saveTransaction(custoTx);
+    // Cria entrada automática na caixinha (5% manutenção + 5% reserva)
+    const entry = createCaixinhaEntry(record);
+    dispatch({ type: "ADD_CAIXINHA_ENTRY", entry });
+    loadCaixinhaEntries().then((entries) => {
+      const idx = entries.findIndex((e) => e.date === entry.date);
+      if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+      saveCaixinhaEntries(entries);
+    });
+  }, []);
+
+  const deleteCaixinhaEntry = useCallback((date: string) => {
+    dispatch({ type: "DELETE_CAIXINHA_ENTRY", date });
+    loadCaixinhaEntries().then((entries) => {
+      const updated = entries.filter((e) => e.date !== date);
+      saveCaixinhaEntries(updated);
+    });
   }, []);
 
   return (
@@ -396,6 +511,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addTransaction,
         setPeriodFilter,
         recordDayWithTransactions,
+        deleteCaixinhaEntry,
       }}
     >
       {children}

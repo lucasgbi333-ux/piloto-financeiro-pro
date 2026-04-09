@@ -108,9 +108,30 @@ export interface ReportItem {
   count?: number;
 }
 
+// ===== CAIXINHA =====
+export interface CaixinhaEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  ganhoBase: number; // valor bruto do dia
+  manutencao: number; // 5% do ganho bruto
+  reserva: number; // 5% do ganho bruto
+  total: number; // 10% do ganho bruto
+}
+
+export interface CaixinhaState {
+  entries: CaixinhaEntry[];
+  saldoManutencao: number;
+  saldoReserva: number;
+  saldoTotal: number;
+}
+
 // ===== DASHBOARD =====
 export interface DashboardState {
   minPerKm: number;
   requiredDaily: number;
   dailyProfit: number;
+  /** Desconto da caixinha do último dia lançado (10% do bruto) */
+  caixinhaDesconto: number;
+  /** Lucro líquido já descontando caixinha */
+  lucroDiaLiquidoComCaixinha: number;
 }

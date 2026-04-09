@@ -80,6 +80,16 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="caixinha"
+        options={{
+          title: "Caixinha",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="banknote.fill" color={color} />
+          ),
+        }}
+      />
+
       {/* Telas ocultas da tab bar */}
       <Tabs.Screen name="vehicle-profiles" options={{ href: null }} />
       <Tabs.Screen name="reports" options={{ href: null }} />

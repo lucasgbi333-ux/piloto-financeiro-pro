@@ -32,6 +32,7 @@ const MAPPING = {
   "gauge.badge.plus": "add-road",
   "car.circle.fill": "commute",
   "steeringwheel": "drive-eta",
+  "banknote.fill": "savings",
 } as IconMapping;
 
 export function IconSymbol({

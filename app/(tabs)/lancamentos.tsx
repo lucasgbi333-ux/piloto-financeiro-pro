@@ -76,11 +76,19 @@ export default function LancamentosScreen() {
   const openModal = (day?: number) => {
     const ds = day ? dateStr(viewYear, viewMonth, day) : todayStr();
     setSelectedDate(ds);
-    // Pré-preenche se já existe registro
+    // Pré-preenche com registro existente OU com dados do Operacional
     const existing = recordMap.get(ds);
-    setKmRodado(existing?.kmRodado ?? 0);
-    setGanho(existing?.ganho ?? 0);
-    setGastoAbastecimento(existing?.custo ?? 0);
+    if (existing) {
+      setKmRodado(existing.kmRodado);
+      setGanho(existing.ganho);
+      setGastoAbastecimento(existing.custo);
+    } else {
+      // Usa dados da aba Operacional como ponto de partida
+      const op = state.operationalInput;
+      setKmRodado(op.kmRodadoDia > 0 ? op.kmRodadoDia : 0);
+      setGanho(op.ganhoDia > 0 ? op.ganhoDia : 0);
+      setGastoAbastecimento(op.gastoAbastecimento > 0 ? op.gastoAbastecimento : 0);
+    }
     setModalVisible(true);
   };
 

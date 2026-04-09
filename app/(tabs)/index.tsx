@@ -13,21 +13,19 @@ function fmtKm(val: number): string {
 
 export default function DashboardScreen() {
   const { state } = useApp();
-  const { dashboard, fixedCostResult, operationalResult, dailyRecords } = state;
+  const { dashboard, fixedCostResult, operationalResult, dailyRecords, caixinha } = state;
 
-  // Lucro líquido do dia = ganho - custo combustível - custo fixo diário
-  const lucroLiquido = dashboard.dailyProfit; // já calculado com lucroDiaLiquido no contexto
-
-  // Custo/km total = combustível + fixos diluídos por km
   const custoPorKmTotal = operationalResult.custoPorKmTotal;
 
-  // Último dia lançado para exibir no dashboard
+  // Último dia lançado
   const ultimoDia = dailyRecords.length > 0
     ? [...dailyRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
     : null;
 
+  // Lucro líquido do último dia: ganho - combustível - fixo diário - caixinha (10%)
+  const caixinhaUltimoDia = ultimoDia ? ultimoDia.ganho * 0.10 : 0;
   const ultimoDiaLucroLiquido = ultimoDia
-    ? ultimoDia.ganho - ultimoDia.custo - fixedCostResult.custoFixoDiario
+    ? ultimoDia.ganho - ultimoDia.custo - fixedCostResult.custoFixoDiario - caixinhaUltimoDia
     : null;
 
   const hasData =
@@ -40,7 +38,7 @@ export default function DashboardScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.greeting}>Piloto Financeiro</Text>
-          <Text style={styles.subtitle}>Pro</Text>
+          <Text style={styles.subtitleAccent}>Pro</Text>
         </View>
 
         {!hasData && (
@@ -81,7 +79,7 @@ export default function DashboardScreen() {
           <Text style={styles.cardHint}>Necessário para cobrir custos fixos</Text>
         </View>
 
-        {/* Card 3: Lucro Líquido do Último Dia */}
+        {/* Card 3: Lucro Líquido do Último Dia (com caixinha descontada) */}
         {ultimoDia && ultimoDiaLucroLiquido !== null && (
           <View style={[styles.card, ultimoDiaLucroLiquido >= 0 ? styles.cardGold : styles.cardRed]}>
             <View style={styles.cardHeader}>
@@ -99,9 +97,44 @@ export default function DashboardScreen() {
             <Text style={[styles.cardValue, { color: ultimoDiaLucroLiquido >= 0 ? "#FFD700" : "#FF453A" }]}>
               {ultimoDiaLucroLiquido >= 0 ? "+" : ""}{fmt(ultimoDiaLucroLiquido)}
             </Text>
-            <Text style={styles.cardHint}>
-              Ganho {fmt(ultimoDia.ganho)} − Combustível {fmt(ultimoDia.custo)} − Fixos {fmt(fixedCostResult.custoFixoDiario)}
+            {/* Breakdown detalhado */}
+            <View style={styles.breakdownList}>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Ganho bruto</Text>
+                <Text style={[styles.breakdownValue, { color: "#30D158" }]}>+{fmt(ultimoDia.ganho)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Combustível/Recarga</Text>
+                <Text style={[styles.breakdownValue, { color: "#FF453A" }]}>−{fmt(ultimoDia.custo)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Custos fixos do dia</Text>
+                <Text style={[styles.breakdownValue, { color: "#FF9500" }]}>−{fmt(fixedCostResult.custoFixoDiario)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Caixinha (10%)</Text>
+                <Text style={[styles.breakdownValue, { color: "#0A84FF" }]}>−{fmt(caixinhaUltimoDia)}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Card Caixinha */}
+        {caixinha.saldoTotal > 0 && (
+          <View style={[styles.card, styles.cardCaixinha]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconCircle, { backgroundColor: "rgba(255,149,0,0.15)" }]}>
+                <Text style={{ fontSize: 18 }}>🪙</Text>
+              </View>
+              <Text style={styles.cardLabel}>CAIXINHA ACUMULADA</Text>
+            </View>
+            <Text style={[styles.cardValue, { color: "#FF9500" }]}>
+              {fmt(caixinha.saldoTotal)}
             </Text>
+            <View style={styles.caixinhaRow}>
+              <Text style={styles.caixinhaItem}>🔧 Manutenção: {fmt(caixinha.saldoManutencao)}</Text>
+              <Text style={styles.caixinhaItem}>🛡️ Reserva: {fmt(caixinha.saldoReserva)}</Text>
+            </View>
           </View>
         )}
 
@@ -112,7 +145,7 @@ export default function DashboardScreen() {
             <Text style={styles.statValue}>{fmt(fixedCostResult.custoFixoDiario)}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Custo/KM Total</Text>
+            <Text style={styles.statLabel}>Custo/KM</Text>
             <Text style={[styles.statValue, { color: "#FF9500" }]}>
               {custoPorKmTotal > 0 ? `R$ ${custoPorKmTotal.toFixed(3).replace(".", ",")}` : "—"}
             </Text>
@@ -152,7 +185,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   header: { flexDirection: "row", alignItems: "baseline", marginBottom: 28, gap: 8 },
   greeting: { color: "#FFFFFF", fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
-  subtitle: { color: "#00D4AA", fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
+  subtitleAccent: { color: "#00D4AA", fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
   onboardingCard: {
     backgroundColor: "#111111", borderRadius: 16, padding: 20,
     marginBottom: 20, borderWidth: 1, borderColor: "#1C1C1E",
@@ -168,11 +201,18 @@ const styles = StyleSheet.create({
   cardBlue: { borderColor: "rgba(10,132,255,0.2)" },
   cardGold: { borderColor: "rgba(255,215,0,0.2)" },
   cardRed: { borderColor: "rgba(255,69,58,0.2)" },
+  cardCaixinha: { borderColor: "rgba(255,149,0,0.2)" },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 10 },
   iconCircle: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
   cardLabel: { color: "#8E8E93", fontSize: 11, fontWeight: "600", letterSpacing: 1 },
-  cardValue: { fontSize: 34, fontWeight: "800", letterSpacing: -1, marginBottom: 4 },
+  cardValue: { fontSize: 34, fontWeight: "800", letterSpacing: -1, marginBottom: 12 },
   cardHint: { color: "#555555", fontSize: 13, fontWeight: "500" },
+  breakdownList: { gap: 4 },
+  breakdownRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  breakdownLabel: { color: "#8E8E93", fontSize: 13 },
+  breakdownValue: { fontSize: 13, fontWeight: "600" },
+  caixinhaRow: { flexDirection: "row", gap: 16, flexWrap: "wrap" },
+  caixinhaItem: { color: "#8E8E93", fontSize: 13 },
   statsRow: { flexDirection: "row", gap: 10, marginTop: 8, marginBottom: 16 },
   statCard: {
     flex: 1, backgroundColor: "#111111", borderRadius: 12, padding: 14,
@@ -187,8 +227,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#111111", borderRadius: 14, padding: 16,
     borderWidth: 1, borderColor: "#FF9500" + "33",
   },
-  fixedBreakdownTitle: { color: "#FF9500", fontSize: 13, fontWeight: "700", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  fixedBreakdownRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  fixedBreakdownTitle: {
+    color: "#FF9500", fontSize: 13, fontWeight: "700",
+    marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5,
+  },
+  fixedBreakdownRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", marginBottom: 6,
+  },
   fixedBreakdownLabel: { color: "#8E8E93", fontSize: 13 },
   fixedBreakdownValue: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
   fixedBreakdownHint: { color: "#555555", fontSize: 12, lineHeight: 18, marginTop: 6 },
