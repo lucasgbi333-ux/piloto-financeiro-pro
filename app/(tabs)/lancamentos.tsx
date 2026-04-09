@@ -451,7 +451,7 @@ export default function LancamentosScreen() {
                   <Text style={[styles.detailValue, { color: "#30D158" }]}>{fmt(detailRecord.ganho)}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Custo Combustível</Text>
+                  <Text style={styles.detailLabel}>{state.activeVehicleType === "ELETRICO" ? "Custo Recarga" : "Custo Combustível"}</Text>
                   <Text style={[styles.detailValue, { color: "#FF453A" }]}>{fmt(detailRecord.custo)}</Text>
                 </View>
                 <View style={styles.detailRow}>

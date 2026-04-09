@@ -50,7 +50,7 @@ function AnimatedBar({
 }
 
 // ===== GRÁFICO DINÂMICO =====
-function DynamicBarChart({ data, custoFixoDiario }: { data: ReturnType<typeof useApp>["state"]["reports"]; custoFixoDiario: number }) {
+function DynamicBarChart({ data, custoFixoDiario, isEletrico }: { data: ReturnType<typeof useApp>["state"]["reports"]; custoFixoDiario: number; isEletrico: boolean }) {
   const [mode, setMode] = useState<"liquido" | "ganho" | "custo">("liquido");
 
   const values = useMemo(() => {
@@ -112,10 +112,10 @@ function DynamicBarChart({ data, custoFixoDiario }: { data: ReturnType<typeof us
       {/* Legenda */}
       <Text style={styles.chartLegend}>
         {mode === "liquido"
-          ? `Lucro líquido = Ganho − Combustível − Fixos (${fmt(custoFixoDiario)}/dia)`
+          ? `Lucro líquido = Ganho − ${isEletrico ? "Recarga" : "Combustível"} − Fixos (${fmt(custoFixoDiario)}/dia)`
           : mode === "ganho"
           ? "Total recebido nas corridas"
-          : "Custo com combustível/recarga"}
+          : `Custo com ${isEletrico ? "recarga elétrica" : "combustível"}`}
       </Text>
     </View>
   );
@@ -145,7 +145,7 @@ function EditDayModal({
           <Text style={styles.modalTitle}>✏️ Editar {record.date}</Text>
           <InputField label="KM Rodados" value={km} onChangeValue={setKm} suffix="km" />
           <InputField label="Ganho do Dia" value={ganho} onChangeValue={setGanho} suffix="R$" />
-          <InputField label="Custo Combustível/Recarga" value={custo} onChangeValue={setCusto} suffix="R$" />
+          <InputField label="Custo Energia" value={custo} onChangeValue={setCusto} suffix="R$" />
           <View style={styles.modalBtns}>
             <TouchableOpacity style={styles.deleteBtn} onPress={() => { onDelete(record.date); onClose(); }} activeOpacity={0.8}>
               <Text style={styles.deleteBtnText}>Excluir</Text>
@@ -225,7 +225,7 @@ export default function HistoricoScreen() {
         </View>
 
         {/* Gráfico dinâmico */}
-        <DynamicBarChart data={state.reports} custoFixoDiario={custoFixoDiario} />
+        <DynamicBarChart data={state.reports} custoFixoDiario={custoFixoDiario} isEletrico={state.activeVehicleType === "ELETRICO"} />
 
         {/* Cards de resumo total */}
         <View style={styles.summaryGrid}>
@@ -238,7 +238,7 @@ export default function HistoricoScreen() {
             <Text style={styles.summaryValue}>{totalKm.toFixed(0)} km</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Combust./Recarga</Text>
+            <Text style={styles.summaryLabel}>{state.activeVehicleType === "ELETRICO" ? "Recarga Elét." : "Combustível"}</Text>
             <Text style={[styles.summaryValue, { color: "#FF9500" }]}>{fmt(totalCusto)}</Text>
           </View>
           <View style={styles.summaryCard}>

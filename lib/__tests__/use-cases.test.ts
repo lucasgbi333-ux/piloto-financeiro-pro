@@ -157,6 +157,99 @@ describe("calculateOperationalCost", () => {
     expect(result.custoPorKm).toBeCloseTo(0.5, 3);
     expect(result.valorMinimoKm).toBeCloseTo(1.0, 3);
   });
+
+  // ===== TESTES ESPECÍFICOS PARA ELÉTRICO =====
+  it("should calculate electric vehicle cost correctly with estimated values", () => {
+    // Exemplo: R$ 0,80/kWh, autonomia 6 km/kWh
+    // Custo estimado por km = 0.80 / 6 = 0.1333
+    const input: OperationalInput = {
+      tipoVeiculo: "ELETRICO",
+      precoCombustivel: 0.80, // R$/kWh
+      autonomia: 6,           // km/kWh
+      kmRodadoDia: 150,
+      ganhoDia: 250,
+      margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 0,
+    };
+    const result = calculateOperationalCost(input);
+    expect(result.isUsingRealCost).toBe(false);
+    expect(result.custoPorKm).toBeCloseTo(0.1333, 3);
+    expect(result.custoTotalDiaEstimado).toBeCloseTo(20, 1); // 0.1333 * 150 = 20
+    expect(result.custoTotalDiaReal).toBeCloseTo(20, 1);
+    expect(result.lucroDia).toBeCloseTo(230, 1); // 250 - 20
+  });
+
+  it("should calculate electric vehicle cost correctly with REAL cost", () => {
+    // Exemplo: gastou R$ 25 na recarga, rodou 150 km
+    // Custo real por km = 25 / 150 = 0.1667
+    const input: OperationalInput = {
+      tipoVeiculo: "ELETRICO",
+      precoCombustivel: 0.80,
+      autonomia: 6,
+      kmRodadoDia: 150,
+      ganhoDia: 250,
+      margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 25, // Gasto real na recarga
+    };
+    const result = calculateOperationalCost(input);
+    expect(result.isUsingRealCost).toBe(true);
+    expect(result.custoPorKm).toBeCloseTo(0.1667, 3); // 25/150
+    expect(result.custoTotalDiaReal).toBeCloseTo(25, 2);
+    expect(result.lucroDia).toBeCloseTo(225, 1); // 250 - 25
+  });
+
+  it("should calculate electric vehicle lucro líquido with fixed costs", () => {
+    const input: OperationalInput = {
+      tipoVeiculo: "ELETRICO",
+      precoCombustivel: 0.80,
+      autonomia: 6,
+      kmRodadoDia: 150,
+      ganhoDia: 250,
+      margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 25,
+    };
+    const custoFixoDiario = 40; // R$ 40/dia de custos fixos
+    const result = calculateOperationalCost(input, undefined, custoFixoDiario);
+    // Lucro líquido = 250 - 25 - 40 = 185
+    expect(result.lucroDiaLiquido).toBeCloseTo(185, 1);
+    // Custo por km total = 25/150 + 40/150 = 0.1667 + 0.2667 = 0.4333
+    expect(result.custoPorKmTotal).toBeCloseTo(0.4333, 3);
+  });
+
+  it("should keep electric and combustion profiles completely independent", () => {
+    // Perfil Combustão: R$ 6/L, 12 km/L
+    const combustaoInput: OperationalInput = {
+      tipoVeiculo: "COMBUSTAO",
+      precoCombustivel: 6.0,
+      autonomia: 12,
+      kmRodadoDia: 200,
+      ganhoDia: 300,
+      margemDesejadaPorKm: 0.5,
+      gastoAbastecimento: 0,
+    };
+    const combustaoResult = calculateOperationalCost(combustaoInput);
+    // Custo/km combustão = 6/12 = 0.50
+    expect(combustaoResult.custoPorKm).toBeCloseTo(0.50, 3);
+
+    // Perfil Elétrico: R$ 0.80/kWh, 6 km/kWh
+    const eletricoInput: OperationalInput = {
+      tipoVeiculo: "ELETRICO",
+      precoCombustivel: 0.80,
+      autonomia: 6,
+      kmRodadoDia: 200,
+      ganhoDia: 300,
+      margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 0,
+    };
+    const eletricoResult = calculateOperationalCost(eletricoInput);
+    // Custo/km elétrico = 0.80/6 = 0.1333
+    expect(eletricoResult.custoPorKm).toBeCloseTo(0.1333, 3);
+
+    // Verifica que são completamente diferentes
+    expect(combustaoResult.custoPorKm).not.toBeCloseTo(eletricoResult.custoPorKm, 2);
+    expect(combustaoResult.custoTotalDiaEstimado).toBeCloseTo(100, 1); // 0.50 * 200
+    expect(eletricoResult.custoTotalDiaEstimado).toBeCloseTo(26.67, 1); // 0.1333 * 200
+  });
 });
 
 // ===== PERFIS DE VEÍCULO =====

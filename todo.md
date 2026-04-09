@@ -75,3 +75,8 @@
 - [x] Operacional: remover custo/km estimado, exibir apenas custo/km real com fallback automático
 - [x] Operacional Elétrico: cálculo REAL automático quando valorRecarregado > 0 e kmRodado > 0
 - [x] Lançamentos: adicionar campo valor mínimo por km no modal
+- [x] Corrigir cálculos do modo Elétrico na aba Operacional
+- [x] Isolar cálculos: Elétrico usa só dados de Elétrico, Combustão usa só dados de Combustão (sem misturar perfis)
+- [x] Corrigir Dashboard: caixinha usando % configurável (não hardcoded 10%)
+- [x] Corrigir rótulos dinâmicos: Combustível vs Recarga Elétrica em todas as telas
+- [x] Adicionar 4 testes unitários específicos para modo Elétrico (18 testes total)

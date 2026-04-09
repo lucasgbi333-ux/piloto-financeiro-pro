@@ -171,7 +171,7 @@ export default function OperationalScreen() {
           {usingRealCost ? (
             <View style={styles.fuelNoteReal}>
               <Text style={styles.fuelNoteRealText}>
-                ✓ Usando custo real baseado na sua {input.tipoVeiculo === "COMBUSTAO" ? "recarga" : "recarga elétrica"}
+                ✓ Usando custo real baseado no seu {input.tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga elétrica"}
               </Text>
             </View>
           ) : (

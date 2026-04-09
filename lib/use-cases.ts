@@ -59,9 +59,15 @@ export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
 // ===== MÓDULO 2: CUSTO OPERACIONAL =====
 /**
  * Calcula custo operacional incluindo fixos diluídos.
- * - custoPorKm = combustível/km
- * - custoPorKmTotal = combustível/km + fixos/km
- * - lucroDiaLiquido = ganho - custo combustível - custoFixoDiario
+ * Funciona para AMBOS os tipos de veículo (Combustão e Elétrico):
+ * - Combustão: precoCombustivel = R$/litro, autonomia = km/L
+ * - Elétrico: precoCombustivel = R$/kWh, autonomia = km/kWh
+ * 
+ * Fórmulas:
+ * - custoPorKm estimado = preco / autonomia (R$/km)
+ * - custoPorKm real = gastoAbastecimento / kmRodadoDia (quando informado)
+ * - custoPorKmTotal = custoPorKm + custoFixoPorKm
+ * - lucroDiaLiquido = ganho - custoEnergia - custoFixoDiario
  */
 export function calculateOperationalCost(
   input: OperationalInput,

@@ -17,13 +17,16 @@ export default function DashboardScreen() {
 
   const custoPorKmTotal = operationalResult.custoPorKmTotal;
 
+  // Percentual total da caixinha (configurável pelo usuário)
+  const pctCaixinha = (caixinha.config.percentualManutencao + caixinha.config.percentualReserva) / 100;
+
   // Último dia lançado
   const ultimoDia = dailyRecords.length > 0
     ? [...dailyRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
     : null;
 
-  // Lucro líquido do último dia: ganho - combustível - fixo diário - caixinha (10%)
-  const caixinhaUltimoDia = ultimoDia ? ultimoDia.ganho * 0.10 : 0;
+  // Lucro líquido do último dia: ganho - combustível - fixo diário - caixinha (% configurável)
+  const caixinhaUltimoDia = ultimoDia ? ultimoDia.ganho * pctCaixinha : 0;
   const ultimoDiaLucroLiquido = ultimoDia
     ? ultimoDia.ganho - ultimoDia.custo - fixedCostResult.custoFixoDiario - caixinhaUltimoDia
     : null;
@@ -104,7 +107,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.breakdownValue, { color: "#30D158" }]}>+{fmt(ultimoDia.ganho)}</Text>
               </View>
               <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Combustível/Recarga</Text>
+                <Text style={styles.breakdownLabel}>{state.activeVehicleType === "ELETRICO" ? "Recarga Elétrica" : "Combustível"}</Text>
                 <Text style={[styles.breakdownValue, { color: "#FF453A" }]}>−{fmt(ultimoDia.custo)}</Text>
               </View>
               <View style={styles.breakdownRow}>
@@ -112,7 +115,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.breakdownValue, { color: "#FF9500" }]}>−{fmt(fixedCostResult.custoFixoDiario)}</Text>
               </View>
               <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Caixinha (10%)</Text>
+                <Text style={styles.breakdownLabel}>Caixinha ({caixinha.config.percentualManutencao + caixinha.config.percentualReserva}%)</Text>
                 <Text style={[styles.breakdownValue, { color: "#0A84FF" }]}>−{fmt(caixinhaUltimoDia)}</Text>
               </View>
             </View>
@@ -145,7 +148,7 @@ export default function DashboardScreen() {
             <Text style={styles.statValue}>{fmt(fixedCostResult.custoFixoDiario)}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Custo/KM</Text>
+            <Text style={styles.statLabel}>{state.activeVehicleType === "ELETRICO" ? "Custo/KM (Elét.)" : "Custo/KM"}</Text>
             <Text style={[styles.statValue, { color: "#FF9500" }]}>
               {custoPorKmTotal > 0 ? `R$ ${custoPorKmTotal.toFixed(3).replace(".", ",")}` : "—"}
             </Text>
