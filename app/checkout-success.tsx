@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
 import { getApiBaseUrl } from "@/constants/oauth";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { LoadingOverlay } from "@/components/loading-overlay";
 
 export default function CheckoutSuccessScreen() {
   const { checkSubscription, session } = useSupabaseAuth();
@@ -101,7 +102,13 @@ export default function CheckoutSuccessScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <>
+      <LoadingOverlay
+        visible={status === "checking"}
+        message="Validando pagamento..."
+        subMessage="Seu acesso está sendo liberado"
+      />
+      <View style={styles.container}>
       {status === "checking" && (
         <>
           <ActivityIndicator size="large" color="#00D4AA" />
@@ -136,6 +143,7 @@ export default function CheckoutSuccessScreen() {
         </>
       )}
     </View>
+    </>
   );
 }
 

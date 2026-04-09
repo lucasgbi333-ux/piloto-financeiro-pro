@@ -141,3 +141,7 @@
 - [x] Criar bridge React Native (JS ↔ Kotlin) para comunicação bidirecional
 - [x] Integrar lógica de cálculo e semáforo com o módulo nativo
 - [x] Gerar instruções para build APK de desenvolvimento
+- [x] Verificar scheme de deep linking no app.config.ts
+- [x] Criar listener de URL com Linking.addEventListener no root layout
+- [x] Criar componente LoadingOverlay premium com CircularProgress
+- [x] Integrar listener e loading state na tela checkout-success
