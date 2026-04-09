@@ -120,3 +120,6 @@
 - [x] Criar rota app/checkout-success.tsx para capturar deep link pilotofinanceiro://checkout-success
 - [x] Criar rota app/checkout-canceled.tsx para capturar deep link pilotofinanceiro://checkout-canceled
 - [x] Lógica na rota: verificar assinatura no Supabase e redirecionar para Dashboard
+- [x] Diagnosticar webhook: verificar se evento customer.subscription.created está chegando ao servidor
+- [x] Criar endpoint POST /api/stripe/activate para ativar assinatura diretamente via Stripe API
+- [x] Atualizar checkout-success.tsx para usar ativação direta via Stripe API (sem depender do webhook)

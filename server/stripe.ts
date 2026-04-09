@@ -164,6 +164,61 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
+  // ── POST /api/stripe/activate ──
+  // Consulta o Stripe diretamente pelo email e ativa a assinatura no Supabase.
+  // Usado pela rota /checkout-success para liberar acesso sem depender do webhook.
+  app.post("/api/stripe/activate", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ error: "Email é obrigatório" });
+        return;
+      }
+
+      const stripe = getStripe();
+
+      // Buscar o customer pelo email
+      const customers = await stripe.customers.list({ email, limit: 1 });
+      if (customers.data.length === 0) {
+        res.json({ ativo: false, message: "Nenhum customer encontrado no Stripe" });
+        return;
+      }
+
+      const customerId = customers.data[0].id;
+
+      // Buscar assinaturas ativas ou em trial para esse customer
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 5,
+      });
+
+      const activeOrTrialing = subscriptions.data.find(
+        (s) => s.status === "active" || s.status === "trialing"
+      );
+
+      if (!activeOrTrialing) {
+        res.json({ ativo: false, message: "Nenhuma assinatura ativa ou em trial encontrada" });
+        return;
+      }
+
+      // Ativar no Supabase
+      await upsertSubscription(email, {
+        ativo: true,
+        plano: "mensal",
+        stripe_customer_id: customerId,
+        stripe_subscription_id: activeOrTrialing.id,
+      });
+
+      console.log(`[Stripe] Activated subscription for ${email} via /activate endpoint (sub: ${activeOrTrialing.id}, status: ${activeOrTrialing.status})`);
+      res.json({ ativo: true, plano: "mensal", subscription_status: activeOrTrialing.status });
+    } catch (err: unknown) {
+      console.error("[Stripe] Activate error:", err);
+      const message = err instanceof Error ? err.message : "Erro ao ativar assinatura";
+      res.status(500).json({ error: message });
+    }
+  });
+
   // ── GET /api/stripe/subscription-status ──
   app.get("/api/stripe/subscription-status", async (req: Request, res: Response) => {
     try {
