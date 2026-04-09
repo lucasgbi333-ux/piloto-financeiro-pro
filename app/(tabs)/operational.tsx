@@ -1,5 +1,5 @@
 import {
-  ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform, TextInput, Alert,
+  ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform, Alert,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { InputField } from "@/components/ui/input-field";
@@ -23,7 +23,6 @@ export default function OperationalScreen() {
 
   // resetKey força remount de todos os InputField quando Limpar é acionado
   const [resetKey, setResetKey] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const vehicleOptions: VehicleType[] = ["COMBUSTAO", "ELETRICO"];
   const vehicleIndex = vehicleOptions.indexOf(input.tipoVeiculo);
@@ -60,7 +59,6 @@ export default function OperationalScreen() {
             resetOperational();
             // Incrementar resetKey força todos os InputField a remontarem com value=0
             setResetKey((k) => k + 1);
-            setSelectedDate(new Date().toISOString().split("T")[0]);
           },
         },
       ]
@@ -72,9 +70,10 @@ export default function OperationalScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     const now = Date.now();
+    const today = new Date().toISOString().split("T")[0];
     recordDayWithTransactions({
-      id: `${selectedDate}-${now}`,
-      date: selectedDate,
+      id: `${today}-${now}`,
+      date: today,
       kmRodado: input.kmRodadoDia,
       ganho: input.ganhoDia,
       custo: result.custoTotalDiaReal,
@@ -226,29 +225,6 @@ export default function OperationalScreen() {
           />
         </View>
 
-        {/* Data do registro */}
-        <View style={styles.dateSection}>
-          <Text style={styles.dateSectionLabel}>Data do Registro</Text>
-          <View style={styles.dateInputRow}>
-            <TextInput
-              style={styles.dateInput}
-              value={selectedDate}
-              onChangeText={(t: string) => {
-                const cleaned = t.replace(/[^0-9-]/g, "").slice(0, 10);
-                setSelectedDate(cleaned);
-              }}
-              placeholder="AAAA-MM-DD"
-              placeholderTextColor="#444444"
-              keyboardType="numbers-and-punctuation"
-              returnKeyType="done"
-              maxLength={10}
-            />
-          </View>
-          <Text style={styles.dateSectionHint}>
-            Você pode registrar dados de qualquer data — hoje ou dias anteriores.
-          </Text>
-        </View>
-
         <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.clearButton} onPress={handleClear} activeOpacity={0.8}>
             <Text style={styles.clearButtonText}>Limpar</Text>
@@ -290,12 +266,6 @@ const styles = StyleSheet.create({
   fuelNoteEstimatedText: { color: "#FF9500", fontSize: 13, fontWeight: "500" },
   resultsSection: { marginBottom: 24 },
   resultsTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "700", marginBottom: 16 },
-  dateSection: {
-    backgroundColor: "#111111", borderRadius: 16, padding: 16,
-    marginBottom: 20, borderWidth: 1, borderColor: "#1C1C1E",
-  },
-  dateSectionLabel: { color: "#FFFFFF", fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  dateSectionHint: { color: "#8E8E93", fontSize: 12, lineHeight: 18, marginTop: 4 },
   buttonRow: {
     flexDirection: "row", gap: 12, marginBottom: 20,
   },
@@ -310,12 +280,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16, alignItems: "center",
   },
   saveButtonText: { color: "#000000", fontSize: 17, fontWeight: "700" },
-  dateInputRow: {
-    backgroundColor: "#111111", borderRadius: 12, borderWidth: 1,
-    borderColor: "#1C1C1E", paddingHorizontal: 16, height: 50,
-    justifyContent: "center",
-  },
-  dateInput: {
-    color: "#FFFFFF", fontSize: 17, fontWeight: "600",
-  },
+
 });

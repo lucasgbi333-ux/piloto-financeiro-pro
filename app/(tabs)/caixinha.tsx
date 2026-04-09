@@ -1,6 +1,7 @@
 import {
-  Text, View, StyleSheet, TouchableOpacity, FlatList, Alert, Platform,
+  Text, View, StyleSheet, TouchableOpacity, FlatList, Alert, Platform, TextInput,
 } from "react-native";
+import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import * as Haptics from "expo-haptics";
@@ -15,9 +16,30 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function parsePct(val: string): number {
+  const n = parseFloat(val.replace(",", "."));
+  if (isNaN(n) || n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
+}
+
 export default function CaixinhaScreen() {
-  const { state, deleteCaixinhaEntry } = useApp();
+  const { state, deleteCaixinhaEntry, setCaixinhaConfig } = useApp();
   const { caixinha } = state;
+
+  const [editingConfig, setEditingConfig] = useState(false);
+  const [pctManut, setPctManut] = useState(String(caixinha.config.percentualManutencao));
+  const [pctReserva, setPctReserva] = useState(String(caixinha.config.percentualReserva));
+
+  const handleSaveConfig = () => {
+    const m = parsePct(pctManut);
+    const r = parsePct(pctReserva);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setCaixinhaConfig({ percentualManutencao: m, percentualReserva: r });
+    setPctManut(String(m));
+    setPctReserva(String(r));
+    setEditingConfig(false);
+  };
 
   const handleDelete = (entry: CaixinhaEntry) => {
     Alert.alert(
@@ -38,6 +60,7 @@ export default function CaixinhaScreen() {
   };
 
   const sortedEntries = [...caixinha.entries].sort((a, b) => b.date.localeCompare(a.date));
+  const totalPct = caixinha.config.percentualManutencao + caixinha.config.percentualReserva;
 
   return (
     <ScreenContainer>
@@ -50,8 +73,94 @@ export default function CaixinhaScreen() {
           <>
             <Text style={styles.title}>Caixinha</Text>
             <Text style={styles.subtitle}>
-              5% do ganho bruto vai para Manutenção e 5% para Reserva de Emergência automaticamente a cada lançamento.
+              Percentuais configuráveis do ganho bruto separados automaticamente a cada lançamento.
             </Text>
+
+            {/* Configuração de percentuais */}
+            <View style={styles.configCard}>
+              <View style={styles.configHeader}>
+                <Text style={styles.configTitle}>⚙️ Configurar Percentuais</Text>
+                <TouchableOpacity
+                  style={[styles.configEditBtn, editingConfig && styles.configEditBtnActive]}
+                  onPress={() => {
+                    if (editingConfig) {
+                      handleSaveConfig();
+                    } else {
+                      setPctManut(String(caixinha.config.percentualManutencao));
+                      setPctReserva(String(caixinha.config.percentualReserva));
+                      setEditingConfig(true);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.configEditBtnText, editingConfig && styles.configEditBtnTextActive]}>
+                    {editingConfig ? "Salvar" : "Editar"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.configRow}>
+                <View style={styles.configItem}>
+                  <Text style={styles.configItemIcon}>🔧</Text>
+                  <Text style={styles.configItemLabel}>Manutenção</Text>
+                  {editingConfig ? (
+                    <View style={styles.configInputRow}>
+                      <TextInput
+                        style={styles.configInput}
+                        value={pctManut}
+                        onChangeText={setPctManut}
+                        keyboardType="decimal-pad"
+                        maxLength={5}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.configPctSymbol}>%</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.configItemValue, { color: "#FF9500" }]}>
+                      {caixinha.config.percentualManutencao}%
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.configDivider} />
+
+                <View style={styles.configItem}>
+                  <Text style={styles.configItemIcon}>🛡️</Text>
+                  <Text style={styles.configItemLabel}>Reserva</Text>
+                  {editingConfig ? (
+                    <View style={styles.configInputRow}>
+                      <TextInput
+                        style={styles.configInput}
+                        value={pctReserva}
+                        onChangeText={setPctReserva}
+                        keyboardType="decimal-pad"
+                        maxLength={5}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.configPctSymbol}>%</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.configItemValue, { color: "#0A84FF" }]}>
+                      {caixinha.config.percentualReserva}%
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {editingConfig && (
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setEditingConfig(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.configNote}>
+                Total separado por dia: <Text style={{ color: "#00D4AA", fontWeight: "700" }}>{totalPct}%</Text> do ganho bruto
+              </Text>
+            </View>
 
             {/* Cards de saldo */}
             <View style={styles.balanceRow}>
@@ -61,7 +170,7 @@ export default function CaixinhaScreen() {
                 <Text style={[styles.balanceValue, { color: "#FF9500" }]}>
                   {fmt(caixinha.saldoManutencao)}
                 </Text>
-                <Text style={styles.balancePercent}>5% por dia</Text>
+                <Text style={styles.balancePercent}>{caixinha.config.percentualManutencao}% por dia</Text>
               </View>
               <View style={[styles.balanceCard, { borderColor: "#0A84FF" }]}>
                 <Text style={styles.balanceIcon}>🛡️</Text>
@@ -69,7 +178,7 @@ export default function CaixinhaScreen() {
                 <Text style={[styles.balanceValue, { color: "#0A84FF" }]}>
                   {fmt(caixinha.saldoReserva)}
                 </Text>
-                <Text style={styles.balancePercent}>5% por dia</Text>
+                <Text style={styles.balancePercent}>{caixinha.config.percentualReserva}% por dia</Text>
               </View>
             </View>
 
@@ -99,9 +208,10 @@ export default function CaixinhaScreen() {
               <Text style={styles.infoTitle}>Como funciona?</Text>
               <Text style={styles.infoText}>
                 Ao salvar um lançamento do dia, o app automaticamente separa{"\n"}
-                • <Text style={{ color: "#FF9500" }}>5% para Manutenção</Text> — pneus, revisão, peças{"\n"}
-                • <Text style={{ color: "#0A84FF" }}>5% para Reserva</Text> — emergências e imprevistos{"\n\n"}
-                Esses valores são descontados do lucro líquido exibido no Dashboard.
+                • <Text style={{ color: "#FF9500" }}>{caixinha.config.percentualManutencao}% para Manutenção</Text> — pneus, revisão, peças{"\n"}
+                • <Text style={{ color: "#0A84FF" }}>{caixinha.config.percentualReserva}% para Reserva</Text> — emergências e imprevistos{"\n\n"}
+                Esses valores são descontados do lucro líquido exibido no Dashboard.{"\n"}
+                Você pode ajustar os percentuais a qualquer momento acima.
               </Text>
             </View>
 
@@ -125,13 +235,19 @@ export default function CaixinhaScreen() {
               <Text style={styles.entryDate}>{formatDate(item.date)}</Text>
               <Text style={styles.entryBase}>Ganho bruto: {fmt(item.ganhoBase)}</Text>
               <View style={styles.entryBreakdown}>
-                <Text style={styles.entryManutencao}>🔧 {fmt(item.manutencao)}</Text>
-                <Text style={styles.entryReserva}>🛡️ {fmt(item.reserva)}</Text>
+                <Text style={styles.entryManutencao}>
+                  🔧 {fmt(item.manutencao)} ({item.percentualManutencao ?? 5}%)
+                </Text>
+                <Text style={styles.entryReserva}>
+                  🛡️ {fmt(item.reserva)} ({item.percentualReserva ?? 5}%)
+                </Text>
               </View>
             </View>
             <View style={styles.entryRight}>
               <Text style={styles.entryTotal}>{fmt(item.total)}</Text>
-              <Text style={styles.entryTotalLabel}>10% bruto</Text>
+              <Text style={styles.entryTotalLabel}>
+                {(item.percentualManutencao ?? 5) + (item.percentualReserva ?? 5)}% bruto
+              </Text>
               <TouchableOpacity
                 style={styles.deleteBtn}
                 onPress={() => handleDelete(item)}
@@ -151,6 +267,47 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   title: { color: "#FFFFFF", fontSize: 32, fontWeight: "700", letterSpacing: -0.5, marginBottom: 8 },
   subtitle: { color: "#8E8E93", fontSize: 15, lineHeight: 22, marginBottom: 24 },
+
+  // Configuração
+  configCard: {
+    backgroundColor: "#111111", borderRadius: 16, padding: 16,
+    marginBottom: 20, borderWidth: 1, borderColor: "#2C2C2E",
+  },
+  configHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  configTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  configEditBtn: {
+    backgroundColor: "rgba(0, 212, 170, 0.1)", borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderWidth: 1, borderColor: "rgba(0, 212, 170, 0.3)",
+  },
+  configEditBtnActive: {
+    backgroundColor: "rgba(0, 212, 170, 0.2)",
+    borderColor: "#00D4AA",
+  },
+  configEditBtnText: { color: "#00D4AA", fontSize: 14, fontWeight: "600" },
+  configEditBtnTextActive: { color: "#00D4AA" },
+  configRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
+  configItem: { flex: 1, alignItems: "center", gap: 6 },
+  configItemIcon: { fontSize: 24 },
+  configItemLabel: { color: "#8E8E93", fontSize: 13, fontWeight: "500" },
+  configItemValue: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  configInputRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  configInput: {
+    backgroundColor: "#1C1C1E", color: "#FFFFFF", fontSize: 24, fontWeight: "700",
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: "#3A3A3C", minWidth: 60, textAlign: "center",
+  },
+  configPctSymbol: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
+  configDivider: { width: 1, backgroundColor: "#2C2C2E", alignSelf: "stretch" },
+  configNote: { color: "#8E8E93", fontSize: 13, textAlign: "center", marginTop: 4 },
+  cancelBtn: {
+    backgroundColor: "rgba(255, 69, 58, 0.1)", borderRadius: 8,
+    paddingVertical: 8, alignItems: "center", marginBottom: 8,
+    borderWidth: 1, borderColor: "rgba(255, 69, 58, 0.3)",
+  },
+  cancelBtnText: { color: "#FF453A", fontSize: 14, fontWeight: "600" },
+
+  // Saldos
   balanceRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   balanceCard: {
     flex: 1, backgroundColor: "#111111", borderRadius: 16, padding: 16,
@@ -185,7 +342,7 @@ const styles = StyleSheet.create({
   entryLeft: { flex: 1 },
   entryDate: { color: "#FFFFFF", fontSize: 16, fontWeight: "700", marginBottom: 4 },
   entryBase: { color: "#8E8E93", fontSize: 13, marginBottom: 8 },
-  entryBreakdown: { flexDirection: "row", gap: 12 },
+  entryBreakdown: { gap: 4 },
   entryManutencao: { color: "#FF9500", fontSize: 13, fontWeight: "600" },
   entryReserva: { color: "#0A84FF", fontSize: 13, fontWeight: "600" },
   entryRight: { alignItems: "flex-end" },

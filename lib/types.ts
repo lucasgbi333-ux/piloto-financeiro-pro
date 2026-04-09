@@ -109,16 +109,26 @@ export interface ReportItem {
 }
 
 // ===== CAIXINHA =====
+export interface CaixinhaConfig {
+  /** Percentual para manutenção (0-100), padrão 5 */
+  percentualManutencao: number;
+  /** Percentual para reserva de emergência (0-100), padrão 5 */
+  percentualReserva: number;
+}
+
 export interface CaixinhaEntry {
   id: string;
   date: string; // YYYY-MM-DD
   ganhoBase: number; // valor bruto do dia
-  manutencao: number; // 5% do ganho bruto
-  reserva: number; // 5% do ganho bruto
-  total: number; // 10% do ganho bruto
+  manutencao: number; // % configurado do ganho bruto
+  reserva: number; // % configurado do ganho bruto
+  total: number; // soma dos dois
+  percentualManutencao: number; // % usado no momento do lançamento
+  percentualReserva: number; // % usado no momento do lançamento
 }
 
 export interface CaixinhaState {
+  config: CaixinhaConfig;
   entries: CaixinhaEntry[];
   saldoManutencao: number;
   saldoReserva: number;

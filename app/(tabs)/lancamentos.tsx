@@ -4,9 +4,11 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { InputField } from "@/components/ui/input-field";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import * as Haptics from "expo-haptics";
 import { useState, useMemo } from "react";
-import type { DailyRecord } from "@/lib/types";
+import type { DailyRecord, VehicleType } from "@/lib/types";
+import { calculateOperationalCost } from "@/lib/use-cases";
 
 const WEEK_DAYS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 const MONTHS = [
@@ -36,11 +38,15 @@ export default function LancamentosScreen() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Modal de lançamento
+  // Modal de lançamento — todos os campos do Operacional
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [tipoVeiculo, setTipoVeiculo] = useState<VehicleType>(state.operationalInput.tipoVeiculo);
+  const [precoCombustivel, setPrecoCombustivel] = useState(state.operationalInput.precoCombustivel);
+  const [autonomia, setAutonomia] = useState(state.operationalInput.autonomia);
   const [kmRodado, setKmRodado] = useState(0);
   const [ganho, setGanho] = useState(0);
+  const [margemDesejada, setMargemDesejada] = useState(state.operationalInput.margemDesejadaPorKm);
   const [gastoAbastecimento, setGastoAbastecimento] = useState(0);
 
   // Modal de detalhe do dia
@@ -59,7 +65,6 @@ export default function LancamentosScreen() {
     const cells: (number | null)[] = [];
     for (let i = 0; i < firstDay; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    // Completa para múltiplo de 7
     while (cells.length % 7 !== 0) cells.push(null);
     return cells;
   }, [viewYear, viewMonth]);
@@ -76,28 +81,43 @@ export default function LancamentosScreen() {
   const openModal = (day?: number) => {
     const ds = day ? dateStr(viewYear, viewMonth, day) : todayStr();
     setSelectedDate(ds);
-    // Pré-preenche com registro existente OU com dados do Operacional
     const existing = recordMap.get(ds);
     if (existing) {
+      // Editar registro existente
       setKmRodado(existing.kmRodado);
       setGanho(existing.ganho);
       setGastoAbastecimento(existing.custo);
+      setTipoVeiculo(state.operationalInput.tipoVeiculo);
+      setPrecoCombustivel(state.operationalInput.precoCombustivel);
+      setAutonomia(state.operationalInput.autonomia);
+      setMargemDesejada(state.operationalInput.margemDesejadaPorKm);
     } else {
-      // Usa dados da aba Operacional como ponto de partida
+      // Novo lançamento — pré-preenche com dados do Operacional
       const op = state.operationalInput;
+      setTipoVeiculo(op.tipoVeiculo);
+      setPrecoCombustivel(op.precoCombustivel > 0 ? op.precoCombustivel : activeProfile.precoEnergia);
+      setAutonomia(op.autonomia > 0 ? op.autonomia : activeProfile.autonomia);
       setKmRodado(op.kmRodadoDia > 0 ? op.kmRodadoDia : 0);
       setGanho(op.ganhoDia > 0 ? op.ganhoDia : 0);
+      setMargemDesejada(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
       setGastoAbastecimento(op.gastoAbastecimento > 0 ? op.gastoAbastecimento : 0);
     }
     setModalVisible(true);
   };
 
+  // Cálculo em tempo real no modal
+  const modalResult = useMemo(() => {
+    return calculateOperationalCost(
+      { tipoVeiculo, precoCombustivel, autonomia, kmRodadoDia: kmRodado, ganhoDia: ganho, margemDesejadaPorKm: margemDesejada, gastoAbastecimento },
+      undefined,
+      fixedCostResult.custoFixoDiario
+    );
+  }, [tipoVeiculo, precoCombustivel, autonomia, kmRodado, ganho, margemDesejada, gastoAbastecimento, fixedCostResult.custoFixoDiario]);
+
   const handleSave = () => {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const now = Date.now();
-    const custoPorKm = activeProfile.autonomia > 0 ? activeProfile.precoEnergia / activeProfile.autonomia : 0;
-    const custoEstimado = custoPorKm * kmRodado;
-    const custoReal = gastoAbastecimento > 0 ? gastoAbastecimento : custoEstimado;
+    const custoReal = gastoAbastecimento > 0 ? gastoAbastecimento : modalResult.custoTotalDiaEstimado;
     recordDayWithTransactions({
       id: `${selectedDate}-${now}`,
       date: selectedDate,
@@ -121,6 +141,7 @@ export default function LancamentosScreen() {
 
   const detailRecord = detailDate ? recordMap.get(detailDate) : null;
   const todayDateStr = todayStr();
+  const usingRealCost = gastoAbastecimento > 0;
 
   return (
     <ScreenContainer>
@@ -244,47 +265,155 @@ export default function LancamentosScreen() {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* Modal de lançamento */}
+      {/* Modal de lançamento — todos os campos do Operacional */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Lançar Dia</Text>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>Lançar Dia</Text>
 
-            {/* Data */}
-            <Text style={styles.modalDateLabel}>Data</Text>
-            <View style={styles.dateInputRow}>
-              <TextInput
-                style={styles.dateInput}
-                value={selectedDate}
-                onChangeText={(t: string) => setSelectedDate(t.replace(/[^0-9-]/g, "").slice(0, 10))}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor="#555"
-                keyboardType="numbers-and-punctuation"
-                returnKeyType="done"
-                maxLength={10}
+              {/* Data */}
+              <Text style={styles.sectionLabel}>Data</Text>
+              <View style={styles.dateInputRow}>
+                <TextInput
+                  style={styles.dateInput}
+                  value={selectedDate}
+                  onChangeText={(t: string) => setSelectedDate(t.replace(/[^0-9-]/g, "").slice(0, 10))}
+                  placeholder="AAAA-MM-DD"
+                  placeholderTextColor="#555"
+                  keyboardType="numbers-and-punctuation"
+                  returnKeyType="done"
+                  maxLength={10}
+                />
+              </View>
+
+              {/* Tipo de veículo */}
+              <Text style={styles.sectionLabel}>Tipo de Veículo</Text>
+              <SegmentedControl
+                options={["Combustão", "Elétrico"]}
+                selectedIndex={tipoVeiculo === "COMBUSTAO" ? 0 : 1}
+                onSelect={(i) => setTipoVeiculo(i === 0 ? "COMBUSTAO" : "ELETRICO")}
               />
-            </View>
+              <View style={styles.sectionSpacer} />
 
-            <InputField label="KM Rodados" value={kmRodado} onChangeValue={setKmRodado} placeholder="0" suffix="km" />
-            <InputField label="Ganho do Dia" value={ganho} onChangeValue={setGanho} placeholder="0,00" suffix="R$" />
-            <InputField
-              label={state.activeVehicleType === "COMBUSTAO" ? "Valor Abastecido (opcional)" : "Valor Recarregado (opcional)"}
-              value={gastoAbastecimento}
-              onChangeValue={setGastoAbastecimento}
-              placeholder="0,00"
-              suffix="R$"
-            />
+              {/* Energia */}
+              <Text style={styles.sectionLabel}>Configuração de Energia</Text>
+              <InputField
+                label={tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (R$/L)" : "Preço kWh (R$)"}
+                value={precoCombustivel}
+                onChangeValue={setPrecoCombustivel}
+                placeholder="0,00"
+                suffix="R$"
+              />
+              <InputField
+                label={tipoVeiculo === "COMBUSTAO" ? "Autonomia (km/L)" : "Autonomia (km/kWh)"}
+                value={autonomia}
+                onChangeValue={setAutonomia}
+                placeholder="0"
+                suffix={tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
+              />
 
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} activeOpacity={0.8}>
-                <Text style={styles.cancelBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-                <Text style={styles.saveBtnText}>Salvar</Text>
-              </TouchableOpacity>
+              {/* Dados do dia */}
+              <Text style={styles.sectionLabel}>Dados do Dia</Text>
+              <InputField
+                label="KM Rodados"
+                value={kmRodado}
+                onChangeValue={setKmRodado}
+                placeholder="0"
+                suffix="km"
+              />
+              <InputField
+                label="Ganho do Dia"
+                value={ganho}
+                onChangeValue={setGanho}
+                placeholder="0,00"
+                suffix="R$"
+              />
+              <InputField
+                label="Margem Desejada por KM"
+                value={margemDesejada}
+                onChangeValue={setMargemDesejada}
+                placeholder="0,00"
+                suffix="R$/km"
+              />
+
+              {/* Abastecimento */}
+              <View style={styles.fuelSection}>
+                <Text style={styles.fuelTitle}>
+                  {tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
+                </Text>
+                <Text style={styles.fuelSubtitle}>
+                  {tipoVeiculo === "COMBUSTAO"
+                    ? "Quanto você gastou no posto hoje? (opcional)"
+                    : "Quanto você gastou na recarga elétrica hoje? (opcional)"}
+                </Text>
+                <InputField
+                  label={tipoVeiculo === "COMBUSTAO" ? "Valor Abastecido" : "Valor Recarregado"}
+                  value={gastoAbastecimento}
+                  onChangeValue={setGastoAbastecimento}
+                  placeholder="0,00 (opcional)"
+                  suffix="R$"
+                />
+                {usingRealCost ? (
+                  <View style={styles.fuelNoteReal}>
+                    <Text style={styles.fuelNoteRealText}>✓ Usando custo real: {fmt(gastoAbastecimento)}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.fuelNoteEstimated}>
+                    <Text style={styles.fuelNoteEstimatedText}>ℹ Custo estimado: {fmt(modalResult.custoTotalDiaEstimado)}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Preview dos resultados */}
+              {(kmRodado > 0 || ganho > 0) && (
+                <View style={styles.previewCard}>
+                  <Text style={styles.previewTitle}>Preview do Lançamento</Text>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>Custo/km</Text>
+                    <Text style={styles.previewValue}>
+                      R$ {modalResult.custoPorKm.toFixed(3).replace(".", ",")}
+                    </Text>
+                  </View>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>Custo do Dia</Text>
+                    <Text style={[styles.previewValue, { color: "#FF453A" }]}>
+                      {fmt(usingRealCost ? gastoAbastecimento : modalResult.custoTotalDiaEstimado)}
+                    </Text>
+                  </View>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>Custo Fixo Diário</Text>
+                    <Text style={[styles.previewValue, { color: "#FF9500" }]}>
+                      {fmt(fixedCostResult.custoFixoDiario)}
+                    </Text>
+                  </View>
+                  <View style={[styles.previewRow, styles.previewRowTotal]}>
+                    <Text style={styles.previewLabelBold}>Lucro Líquido</Text>
+                    <Text style={[styles.previewValueBold, {
+                      color: modalResult.lucroDia >= 0 ? "#30D158" : "#FF453A"
+                    }]}>
+                      {fmt(modalResult.lucroDia)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} activeOpacity={0.8}>
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+                  <Text style={styles.saveBtnText}>Salvar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -326,11 +455,14 @@ export default function LancamentosScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.editBtn} onPress={() => {
                     setDetailDate(null);
-                    setSelectedDate(detailRecord.date);
-                    setKmRodado(detailRecord.kmRodado);
-                    setGanho(detailRecord.ganho);
-                    setGastoAbastecimento(detailRecord.custo);
-                    setModalVisible(true);
+                    openModal();
+                    // Abre o modal com os dados do registro
+                    setTimeout(() => {
+                      setSelectedDate(detailRecord.date);
+                      setKmRodado(detailRecord.kmRodado);
+                      setGanho(detailRecord.ganho);
+                      setGastoAbastecimento(detailRecord.custo);
+                    }, 50);
                   }} activeOpacity={0.8}>
                     <Text style={styles.editBtnText}>Editar</Text>
                   </TouchableOpacity>
@@ -409,6 +541,8 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "flex-end",
   },
+  modalScroll: { maxHeight: "92%" },
+  modalScrollContent: { justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: "#111111", borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24, paddingBottom: 40,
@@ -422,13 +556,41 @@ const styles = StyleSheet.create({
     borderRadius: 2, alignSelf: "center", marginBottom: 20,
   },
   modalTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "700", marginBottom: 16 },
-  modalDateLabel: { color: "#8E8E93", fontSize: 13, fontWeight: "500", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+  sectionLabel: {
+    color: "#8E8E93", fontSize: 12, fontWeight: "600",
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4,
+  },
+  sectionSpacer: { height: 12 },
   dateInputRow: {
     backgroundColor: "#000000", borderRadius: 12, borderWidth: 1,
     borderColor: "#2C2C2E", paddingHorizontal: 16, height: 50,
     justifyContent: "center", marginBottom: 12,
   },
   dateInput: { color: "#FFFFFF", fontSize: 17, fontWeight: "600" },
+  fuelSection: {
+    backgroundColor: "#0A0A0A", borderRadius: 14, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: "#2C2C2E",
+  },
+  fuelTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "700", marginBottom: 4 },
+  fuelSubtitle: { color: "#8E8E93", fontSize: 12, lineHeight: 16, marginBottom: 12 },
+  fuelNoteReal: { backgroundColor: "rgba(0,212,170,0.1)", borderRadius: 8, padding: 8, marginTop: -4 },
+  fuelNoteRealText: { color: "#00D4AA", fontSize: 12, fontWeight: "500" },
+  fuelNoteEstimated: { backgroundColor: "rgba(255,149,0,0.1)", borderRadius: 8, padding: 8, marginTop: -4 },
+  fuelNoteEstimatedText: { color: "#FF9500", fontSize: 12, fontWeight: "500" },
+  previewCard: {
+    backgroundColor: "#0A0A0A", borderRadius: 14, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: "#2C2C2E",
+  },
+  previewTitle: { color: "#8E8E93", fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
+  previewRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#1C1C1E",
+  },
+  previewRowTotal: { borderBottomWidth: 0, marginTop: 4 },
+  previewLabel: { color: "#8E8E93", fontSize: 13 },
+  previewValue: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
+  previewLabelBold: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  previewValueBold: { fontSize: 18, fontWeight: "800" },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   cancelBtn: {
     flex: 1, backgroundColor: "#1C1C1E", borderRadius: 12,

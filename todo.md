@@ -67,3 +67,6 @@
 - [x] Criar aba Caixinha com 5% manutenção + 5% reserva automáticos
 - [x] Atualizar Dashboard com descontos da Caixinha no lucro líquido
 - [x] Atualizar Histórico com descontos da Caixinha
+- [x] Tornar percentuais da Caixinha configuráveis pelo usuário (manutenção e reserva)
+- [x] Remover campo de data do Operacional
+- [x] Expandir modal de Lançamentos com todos os campos do Operacional

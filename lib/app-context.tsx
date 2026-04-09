@@ -4,6 +4,7 @@ import React, {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import type {
@@ -20,6 +21,7 @@ import type {
   DashboardState,
   CaixinhaEntry,
   CaixinhaState,
+  CaixinhaConfig,
 } from "./types";
 import {
   calculateFixedCosts,
@@ -48,6 +50,12 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const CAIXINHA_KEY = "@pfp:caixinha_entries";
+const CAIXINHA_CONFIG_KEY = "@pfp:caixinha_config";
+
+const DEFAULT_CAIXINHA_CONFIG: CaixinhaConfig = {
+  percentualManutencao: 5,
+  percentualReserva: 5,
+};
 
 async function saveCaixinhaEntries(entries: CaixinhaEntry[]): Promise<void> {
   await AsyncStorage.setItem(CAIXINHA_KEY, JSON.stringify(entries));
@@ -58,10 +66,20 @@ async function loadCaixinhaEntries(): Promise<CaixinhaEntry[]> {
   return raw ? JSON.parse(raw) : [];
 }
 
-function buildCaixinhaState(entries: CaixinhaEntry[]): CaixinhaState {
+async function saveCaixinhaConfig(config: CaixinhaConfig): Promise<void> {
+  await AsyncStorage.setItem(CAIXINHA_CONFIG_KEY, JSON.stringify(config));
+}
+
+async function loadCaixinhaConfig(): Promise<CaixinhaConfig> {
+  const raw = await AsyncStorage.getItem(CAIXINHA_CONFIG_KEY);
+  return raw ? JSON.parse(raw) : DEFAULT_CAIXINHA_CONFIG;
+}
+
+function buildCaixinhaState(entries: CaixinhaEntry[], config: CaixinhaConfig): CaixinhaState {
   const saldoManutencao = entries.reduce((s, e) => s + e.manutencao, 0);
   const saldoReserva = entries.reduce((s, e) => s + e.reserva, 0);
   return {
+    config,
     entries,
     saldoManutencao,
     saldoReserva,
@@ -69,9 +87,9 @@ function buildCaixinhaState(entries: CaixinhaEntry[]): CaixinhaState {
   };
 }
 
-function createCaixinhaEntry(record: DailyRecord): CaixinhaEntry {
-  const manutencao = record.ganho * 0.05;
-  const reserva = record.ganho * 0.05;
+function createCaixinhaEntry(record: DailyRecord, config: CaixinhaConfig): CaixinhaEntry {
+  const manutencao = record.ganho * (config.percentualManutencao / 100);
+  const reserva = record.ganho * (config.percentualReserva / 100);
   return {
     id: `caixinha-${record.date}-${Date.now()}`,
     date: record.date,
@@ -79,6 +97,8 @@ function createCaixinhaEntry(record: DailyRecord): CaixinhaEntry {
     manutencao,
     reserva,
     total: manutencao + reserva,
+    percentualManutencao: config.percentualManutencao,
+    percentualReserva: config.percentualReserva,
   };
 }
 
@@ -131,8 +151,8 @@ function computeDashboard(
   caixinha: CaixinhaState,
   lastRecord?: DailyRecord
 ): DashboardState {
-  // Desconto da caixinha do último dia (10% do ganho bruto)
-  const caixinhaDesconto = lastRecord ? lastRecord.ganho * 0.10 : 0;
+  const pct = (caixinha.config.percentualManutencao + caixinha.config.percentualReserva) / 100;
+  const caixinhaDesconto = lastRecord ? lastRecord.ganho * pct : 0;
   const lucroDiaLiquidoComCaixinha = opResult.lucroDiaLiquido - caixinhaDesconto;
   return {
     minPerKm: opResult.valorMinimoKm,
@@ -152,7 +172,7 @@ function buildInitialState(): AppState {
   const activeType: VehicleType = "COMBUSTAO";
   const activeProfile = getActiveProfile(defaultProfiles, activeType);
   const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile, fixedResult.custoFixoDiario);
-  const caixinha = buildCaixinhaState([]);
+  const caixinha = buildCaixinhaState([], DEFAULT_CAIXINHA_CONFIG);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
@@ -182,6 +202,7 @@ type Action =
       vehicleProfiles: VehicleProfile[];
       activeVehicleType: VehicleType;
       caixinhaEntries: CaixinhaEntry[];
+      caixinhaConfig: CaixinhaConfig;
     }
   | { type: "SET_FIXED_COSTS"; input: FixedCostInput }
   | { type: "SET_OPERATIONAL"; input: OperationalInput }
@@ -193,7 +214,8 @@ type Action =
   | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter }
   | { type: "RESET_OPERATIONAL" }
   | { type: "ADD_CAIXINHA_ENTRY"; entry: CaixinhaEntry }
-  | { type: "DELETE_CAIXINHA_ENTRY"; date: string };
+  | { type: "DELETE_CAIXINHA_ENTRY"; date: string }
+  | { type: "SET_CAIXINHA_CONFIG"; config: CaixinhaConfig };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -208,7 +230,7 @@ function reducer(state: AppState, action: Action): AppState {
       const activeProfile = getActiveProfile(profiles, activeType);
       const or2 = calculateOperationalCost(oi, activeProfile, fr.custoFixoDiario);
       const recs = action.records;
-      const caixinha = buildCaixinhaState(action.caixinhaEntries);
+      const caixinha = buildCaixinhaState(action.caixinhaEntries, action.caixinhaConfig);
       const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
         ...state,
@@ -293,7 +315,6 @@ function reducer(state: AppState, action: Action): AppState {
       } else {
         recs.push(action.record);
       }
-      // O último registro define o desconto da caixinha no dashboard
       const lastRecord = recs[recs.length - 1];
       return {
         ...state,
@@ -304,9 +325,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "DELETE_DAILY_RECORD": {
       const recs = state.dailyRecords.filter((r) => r.date !== action.date);
-      // Remove entrada da caixinha do mesmo dia
       const newEntries = state.caixinha.entries.filter((e) => e.date !== action.date);
-      const newCaixinha = buildCaixinhaState(newEntries);
+      const newCaixinha = buildCaixinhaState(newEntries, state.caixinha.config);
       const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
         ...state,
@@ -342,14 +362,13 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "ADD_CAIXINHA_ENTRY": {
       const entries = [...state.caixinha.entries];
-      // Upsert por data
       const idx = entries.findIndex((e) => e.date === action.entry.date);
       if (idx >= 0) {
         entries[idx] = action.entry;
       } else {
         entries.push(action.entry);
       }
-      const newCaixinha = buildCaixinhaState(entries);
+      const newCaixinha = buildCaixinhaState(entries, state.caixinha.config);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
@@ -359,7 +378,16 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "DELETE_CAIXINHA_ENTRY": {
       const entries = state.caixinha.entries.filter((e) => e.date !== action.date);
-      const newCaixinha = buildCaixinhaState(entries);
+      const newCaixinha = buildCaixinhaState(entries, state.caixinha.config);
+      const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
+      return {
+        ...state,
+        caixinha: newCaixinha,
+        dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, newCaixinha, lastRecord),
+      };
+    }
+    case "SET_CAIXINHA_CONFIG": {
+      const newCaixinha = buildCaixinhaState(state.caixinha.entries, action.config);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
@@ -386,16 +414,19 @@ interface AppContextValue {
   setPeriodFilter: (filter: PeriodFilter) => void;
   recordDayWithTransactions: (record: DailyRecord) => void;
   deleteCaixinhaEntry: (date: string) => void;
+  setCaixinhaConfig: (config: CaixinhaConfig) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
     (async () => {
-      const [fi, oi, recs, txs, profiles, activeType, caixinhaEntries] = await Promise.all([
+      const [fi, oi, recs, txs, profiles, activeType, caixinhaEntries, caixinhaConfig] = await Promise.all([
         loadFixedCosts(),
         loadOperational(),
         loadDailyRecords(),
@@ -403,6 +434,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         loadVehicleProfiles(),
         loadActiveVehicleType(),
         loadCaixinhaEntries(),
+        loadCaixinhaConfig(),
       ]);
       dispatch({
         type: "LOAD_ALL",
@@ -413,6 +445,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         vehicleProfiles: profiles,
         activeVehicleType: activeType,
         caixinhaEntries,
+        caixinhaConfig,
       });
     })();
   }, []);
@@ -454,7 +487,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeDailyRecord = useCallback((date: string) => {
     dispatch({ type: "DELETE_DAILY_RECORD", date });
     deleteDailyRecord(date);
-    // Remove entrada da caixinha do mesmo dia e persiste
     loadCaixinhaEntries().then((entries) => {
       const updated = entries.filter((e) => e.date !== date);
       saveCaixinhaEntries(updated);
@@ -470,24 +502,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_PERIOD_FILTER", filter });
   }, []);
 
-  const recordDayWithTransactions = useCallback((record: DailyRecord) => {
-    dispatch({ type: "ADD_DAILY_RECORD", record });
-    saveDailyRecord(record);
-    const ganhoTx = createGanhoTransaction(record);
-    const custoTx = createCustoTransaction(record);
-    dispatch({ type: "ADD_TRANSACTION", transaction: ganhoTx });
-    dispatch({ type: "ADD_TRANSACTION", transaction: custoTx });
-    saveTransaction(ganhoTx);
-    saveTransaction(custoTx);
-    // Cria entrada automática na caixinha (5% manutenção + 5% reserva)
-    const entry = createCaixinhaEntry(record);
-    dispatch({ type: "ADD_CAIXINHA_ENTRY", entry });
-    loadCaixinhaEntries().then((entries) => {
-      const idx = entries.findIndex((e) => e.date === entry.date);
-      if (idx >= 0) entries[idx] = entry; else entries.push(entry);
-      saveCaixinhaEntries(entries);
-    });
-  }, []);
+  const recordDayWithTransactions = useCallback(
+    (record: DailyRecord) => {
+      dispatch({ type: "ADD_DAILY_RECORD", record });
+      saveDailyRecord(record);
+      const ganhoTx = createGanhoTransaction(record);
+      const custoTx = createCustoTransaction(record);
+      dispatch({ type: "ADD_TRANSACTION", transaction: ganhoTx });
+      dispatch({ type: "ADD_TRANSACTION", transaction: custoTx });
+      saveTransaction(ganhoTx);
+      saveTransaction(custoTx);
+      // Usa o config atual via ref para criar a entrada da caixinha
+      const config = stateRef.current.caixinha.config;
+      const entry = createCaixinhaEntry(record, config);
+      dispatch({ type: "ADD_CAIXINHA_ENTRY", entry });
+      loadCaixinhaEntries().then((entries) => {
+        const idx = entries.findIndex((e) => e.date === entry.date);
+        if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+        saveCaixinhaEntries(entries);
+      });
+    },
+    []
+  );
 
   const deleteCaixinhaEntry = useCallback((date: string) => {
     dispatch({ type: "DELETE_CAIXINHA_ENTRY", date });
@@ -495,6 +531,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updated = entries.filter((e) => e.date !== date);
       saveCaixinhaEntries(updated);
     });
+  }, []);
+
+  const setCaixinhaConfig = useCallback((config: CaixinhaConfig) => {
+    dispatch({ type: "SET_CAIXINHA_CONFIG", config });
+    saveCaixinhaConfig(config);
   }, []);
 
   return (
@@ -512,6 +553,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPeriodFilter,
         recordDayWithTransactions,
         deleteCaixinhaEntry,
+        setCaixinhaConfig,
       }}
     >
       {children}
