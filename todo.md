@@ -61,3 +61,4 @@
 - [x] Recolocar aba Operacional com ícone moderno na navegação
 - [x] Adicionar botão Limpar na aba Operacional com confirmação
 - [x] Ao limpar Operacional, zerar campos do dia e atualizar Dashboard
+- [x] Corrigir botão Limpar da aba Operacional: campos não zeram visualmente na tela

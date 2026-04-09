@@ -1,5 +1,5 @@
 import { Text, TextInput, View, type TextInputProps, StyleSheet } from "react-native";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface InputFieldProps extends Omit<TextInputProps, "value" | "onChangeText"> {
   label: string;
@@ -25,6 +25,14 @@ export function InputField({
   // Texto exibido no input — começa vazio se valor for 0
   const [text, setText] = useState<string>(value > 0 ? String(value) : "");
   const [focused, setFocused] = useState(false);
+
+  // Sincroniza o texto interno quando o valor externo muda e o campo não está focado
+  // Isso garante que ao resetar (value=0), o campo é limpo visualmente
+  useEffect(() => {
+    if (!focused) {
+      setText(value > 0 ? String(value).replace(".", ",") : "");
+    }
+  }, [value, focused]);
 
   const parseNum = useCallback((raw: string): number => {
     // Aceita vírgula ou ponto como separador decimal
@@ -67,8 +75,8 @@ export function InputField({
     }
   }, [text, parseNum]);
 
-  // Quando o valor externo muda (ex: reset) e o campo não está focado, sincroniza
-  const displayText = focused ? text : (value > 0 ? (text || String(value)) : text);
+  // Exibe o texto interno (já sincronizado pelo useEffect acima)
+  const displayText = text;
 
   return (
     <View style={styles.container}>

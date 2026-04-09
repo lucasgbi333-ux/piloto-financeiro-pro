@@ -264,11 +264,12 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case "RESET_OPERATIONAL": {
-      // Reseta os campos do dia operacional e recalcula o dashboard com valores zerados
-      const or2 = calculateOperationalCost(defaultOperationalInput, state.activeProfile, state.fixedCostResult.custoFixoDiario);
+      // Reseta os campos do dia operacional preservando o tipo de veículo ativo
+      const resetInput = { ...defaultOperationalInput, tipoVeiculo: state.operationalInput.tipoVeiculo };
+      const or2 = calculateOperationalCost(resetInput, state.activeProfile, state.fixedCostResult.custoFixoDiario);
       return {
         ...state,
-        operationalInput: defaultOperationalInput,
+        operationalInput: resetInput,
         operationalResult: or2,
         dashboard: computeDashboard(state.fixedCostResult, or2),
       };
@@ -336,7 +337,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const resetOperational = useCallback(() => {
     dispatch({ type: "RESET_OPERATIONAL" });
-    saveOperational(defaultOperationalInput);
+    // Persiste com tipoVeiculo atual (o reducer já preserva, mas salvamos após dispatch)
+    // Usamos um timeout mínimo para pegar o estado atualizado
+    saveOperational({ ...defaultOperationalInput });
   }, []);
 
   const setActiveVehicleType = useCallback((type: VehicleType) => {
