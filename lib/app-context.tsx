@@ -51,6 +51,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const CAIXINHA_KEY = "@pfp:caixinha_entries";
 const CAIXINHA_CONFIG_KEY = "@pfp:caixinha_config";
+const OP_PROFILES_KEY = "@pfp:op_profiles_v2";
 
 const DEFAULT_CAIXINHA_CONFIG: CaixinhaConfig = {
   percentualManutencao: 5,
@@ -73,6 +74,46 @@ async function saveCaixinhaConfig(config: CaixinhaConfig): Promise<void> {
 async function loadCaixinhaConfig(): Promise<CaixinhaConfig> {
   const raw = await AsyncStorage.getItem(CAIXINHA_CONFIG_KEY);
   return raw ? JSON.parse(raw) : DEFAULT_CAIXINHA_CONFIG;
+}
+
+// ===== PERFIS OPERACIONAIS SEPARADOS =====
+export interface OperationalProfiles {
+  COMBUSTAO: OperationalInput;
+  ELETRICO: OperationalInput;
+}
+
+const defaultCombustaoInput: OperationalInput = {
+  tipoVeiculo: "COMBUSTAO",
+  precoCombustivel: 0,
+  autonomia: 0,
+  kmRodadoDia: 0,
+  ganhoDia: 0,
+  margemDesejadaPorKm: 0,
+  gastoAbastecimento: 0,
+};
+
+const defaultEletricoInput: OperationalInput = {
+  tipoVeiculo: "ELETRICO",
+  precoCombustivel: 0,
+  autonomia: 0,
+  kmRodadoDia: 0,
+  ganhoDia: 0,
+  margemDesejadaPorKm: 0,
+  gastoAbastecimento: 0,
+};
+
+const defaultOperationalProfiles: OperationalProfiles = {
+  COMBUSTAO: defaultCombustaoInput,
+  ELETRICO: defaultEletricoInput,
+};
+
+async function saveOperationalProfiles(profiles: OperationalProfiles): Promise<void> {
+  await AsyncStorage.setItem(OP_PROFILES_KEY, JSON.stringify(profiles));
+}
+
+async function loadOperationalProfiles(): Promise<OperationalProfiles | null> {
+  const raw = await AsyncStorage.getItem(OP_PROFILES_KEY);
+  return raw ? JSON.parse(raw) : null;
 }
 
 function buildCaixinhaState(entries: CaixinhaEntry[], config: CaixinhaConfig): CaixinhaState {
@@ -106,8 +147,11 @@ function createCaixinhaEntry(record: DailyRecord, config: CaixinhaConfig): Caixi
 interface AppState {
   fixedCostInput: FixedCostInput;
   fixedCostResult: FixedCostResult;
+  /** Input ativo (do tipo selecionado) */
   operationalInput: OperationalInput;
   operationalResult: OperationalResult;
+  /** Perfis operacionais independentes por tipo */
+  operationalProfiles: OperationalProfiles;
   vehicleProfiles: VehicleProfile[];
   activeVehicleType: VehicleType;
   activeProfile: VehicleProfile;
@@ -131,17 +175,7 @@ const defaultFixedInput: FixedCostInput = {
   tipoSeguro: "ANUAL",
 };
 
-const defaultOperationalInput: OperationalInput = {
-  tipoVeiculo: "COMBUSTAO",
-  precoCombustivel: 0,
-  autonomia: 0,
-  kmRodadoDia: 0,
-  ganhoDia: 0,
-  margemDesejadaPorKm: 0,
-  gastoAbastecimento: 0,
-};
-
-function getActiveProfile(profiles: VehicleProfile[], type: VehicleType): VehicleProfile {
+function getActiveVehicleProfile(profiles: VehicleProfile[], type: VehicleType): VehicleProfile {
   return profiles.find((p) => p.type === type) ?? getDefaultVehicleProfile(type);
 }
 
@@ -165,20 +199,21 @@ function computeDashboard(
 
 function buildInitialState(): AppState {
   const fixedResult = calculateFixedCosts(defaultFixedInput);
-  const defaultProfiles = [
+  const defaultVehicleProfiles = [
     getDefaultVehicleProfile("COMBUSTAO"),
     getDefaultVehicleProfile("ELETRICO"),
   ];
   const activeType: VehicleType = "COMBUSTAO";
-  const activeProfile = getActiveProfile(defaultProfiles, activeType);
-  const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile, fixedResult.custoFixoDiario);
+  const activeProfile = getActiveVehicleProfile(defaultVehicleProfiles, activeType);
+  const opResult = calculateOperationalCost(defaultCombustaoInput, activeProfile, fixedResult.custoFixoDiario);
   const caixinha = buildCaixinhaState([], DEFAULT_CAIXINHA_CONFIG);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
-    operationalInput: defaultOperationalInput,
+    operationalInput: defaultCombustaoInput,
     operationalResult: opResult,
-    vehicleProfiles: defaultProfiles,
+    operationalProfiles: defaultOperationalProfiles,
+    vehicleProfiles: defaultVehicleProfiles,
     activeVehicleType: activeType,
     activeProfile,
     dailyRecords: [],
@@ -196,7 +231,7 @@ type Action =
   | {
       type: "LOAD_ALL";
       fixedInput: FixedCostInput;
-      opInput: OperationalInput;
+      opProfiles: OperationalProfiles;
       records: DailyRecord[];
       transactions: Transaction[];
       vehicleProfiles: VehicleProfile[];
@@ -221,14 +256,15 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "LOAD_ALL": {
       const fi = action.fixedInput;
-      const oi = action.opInput;
       const fr = calculateFixedCosts(fi);
       const profiles = action.vehicleProfiles.length > 0
         ? action.vehicleProfiles
         : [getDefaultVehicleProfile("COMBUSTAO"), getDefaultVehicleProfile("ELETRICO")];
       const activeType = action.activeVehicleType;
-      const activeProfile = getActiveProfile(profiles, activeType);
-      const or2 = calculateOperationalCost(oi, activeProfile, fr.custoFixoDiario);
+      const activeProfile = getActiveVehicleProfile(profiles, activeType);
+      const opProfiles = action.opProfiles;
+      const activeOpInput = opProfiles[activeType];
+      const or2 = calculateOperationalCost(activeOpInput, activeProfile, fr.custoFixoDiario);
       const recs = action.records;
       const caixinha = buildCaixinhaState(action.caixinhaEntries, action.caixinhaConfig);
       const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
@@ -236,8 +272,9 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         fixedCostInput: fi,
         fixedCostResult: fr,
-        operationalInput: oi,
+        operationalInput: activeOpInput,
         operationalResult: or2,
+        operationalProfiles: opProfiles,
         vehicleProfiles: profiles,
         activeVehicleType: activeType,
         activeProfile,
@@ -264,26 +301,30 @@ function reducer(state: AppState, action: Action): AppState {
     case "SET_OPERATIONAL": {
       const or2 = calculateOperationalCost(action.input, state.activeProfile, state.fixedCostResult.custoFixoDiario);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
+      // Atualiza o perfil do tipo ativo nos operationalProfiles
+      const updatedProfiles: OperationalProfiles = {
+        ...state.operationalProfiles,
+        [action.input.tipoVeiculo]: action.input,
+      };
       return {
         ...state,
         operationalInput: action.input,
         operationalResult: or2,
+        operationalProfiles: updatedProfiles,
         dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
     }
     case "SET_ACTIVE_VEHICLE_TYPE": {
-      const activeProfile = getActiveProfile(state.vehicleProfiles, action.vehicleType);
-      const or2 = calculateOperationalCost(
-        { ...state.operationalInput, tipoVeiculo: action.vehicleType },
-        activeProfile,
-        state.fixedCostResult.custoFixoDiario
-      );
+      const activeProfile = getActiveVehicleProfile(state.vehicleProfiles, action.vehicleType);
+      // Carrega o perfil operacional do tipo selecionado
+      const activeOpInput = state.operationalProfiles[action.vehicleType];
+      const or2 = calculateOperationalCost(activeOpInput, activeProfile, state.fixedCostResult.custoFixoDiario);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
         ...state,
         activeVehicleType: action.vehicleType,
         activeProfile,
-        operationalInput: { ...state.operationalInput, tipoVeiculo: action.vehicleType },
+        operationalInput: activeOpInput,
         operationalResult: or2,
         dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
@@ -296,7 +337,7 @@ function reducer(state: AppState, action: Action): AppState {
       } else {
         profiles.push(action.profile);
       }
-      const activeProfile = getActiveProfile(profiles, state.activeVehicleType);
+      const activeProfile = getActiveVehicleProfile(profiles, state.activeVehicleType);
       const or2 = calculateOperationalCost(state.operationalInput, activeProfile, state.fixedCostResult.custoFixoDiario);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
       return {
@@ -350,13 +391,21 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case "RESET_OPERATIONAL": {
-      const resetInput = { ...defaultOperationalInput, tipoVeiculo: state.operationalInput.tipoVeiculo };
+      const resetInput: OperationalInput = {
+        ...(state.activeVehicleType === "COMBUSTAO" ? defaultCombustaoInput : defaultEletricoInput),
+        tipoVeiculo: state.activeVehicleType,
+      };
       const or2 = calculateOperationalCost(resetInput, state.activeProfile, state.fixedCostResult.custoFixoDiario);
       const lastRecord = state.dailyRecords.length > 0 ? state.dailyRecords[state.dailyRecords.length - 1] : undefined;
+      const updatedProfiles: OperationalProfiles = {
+        ...state.operationalProfiles,
+        [state.activeVehicleType]: resetInput,
+      };
       return {
         ...state,
         operationalInput: resetInput,
         operationalResult: or2,
+        operationalProfiles: updatedProfiles,
         dashboard: computeDashboard(state.fixedCostResult, or2, state.caixinha, lastRecord),
       };
     }
@@ -426,23 +475,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [fi, oi, recs, txs, profiles, activeType, caixinhaEntries, caixinhaConfig] = await Promise.all([
-        loadFixedCosts(),
-        loadOperational(),
-        loadDailyRecords(),
-        loadTransactions(),
-        loadVehicleProfiles(),
-        loadActiveVehicleType(),
-        loadCaixinhaEntries(),
-        loadCaixinhaConfig(),
-      ]);
+      const [fi, recs, txs, vehicleProfiles, activeType, caixinhaEntries, caixinhaConfig, savedOpProfiles] =
+        await Promise.all([
+          loadFixedCosts(),
+          loadDailyRecords(),
+          loadTransactions(),
+          loadVehicleProfiles(),
+          loadActiveVehicleType(),
+          loadCaixinhaEntries(),
+          loadCaixinhaConfig(),
+          loadOperationalProfiles(),
+        ]);
+
+      // Migração: se existir o input antigo mas não os novos perfis, usa-o para o tipo ativo
+      let opProfiles = savedOpProfiles ?? defaultOperationalProfiles;
+      if (!savedOpProfiles) {
+        const legacyOp = await loadOperational();
+        if (legacyOp) {
+          opProfiles = {
+            ...defaultOperationalProfiles,
+            [legacyOp.tipoVeiculo]: legacyOp,
+          };
+        }
+      }
+
       dispatch({
         type: "LOAD_ALL",
         fixedInput: fi || defaultFixedInput,
-        opInput: oi || defaultOperationalInput,
+        opProfiles,
         records: recs,
         transactions: txs,
-        vehicleProfiles: profiles,
+        vehicleProfiles,
         activeVehicleType: activeType,
         caixinhaEntries,
         caixinhaConfig,
@@ -461,12 +524,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setOperational = useCallback((input: OperationalInput) => {
     dispatch({ type: "SET_OPERATIONAL", input });
-    saveOperational(input);
+    // Salva o perfil atualizado nos perfis separados
+    const current = stateRef.current;
+    const updatedProfiles: OperationalProfiles = {
+      ...current.operationalProfiles,
+      [input.tipoVeiculo]: input,
+    };
+    saveOperationalProfiles(updatedProfiles);
+    saveOperational(input); // mantém compatibilidade
   }, []);
 
   const resetOperational = useCallback(() => {
     dispatch({ type: "RESET_OPERATIONAL" });
-    saveOperational({ ...defaultOperationalInput });
+    const current = stateRef.current;
+    const resetInput: OperationalInput = {
+      ...(current.activeVehicleType === "COMBUSTAO" ? defaultCombustaoInput : defaultEletricoInput),
+      tipoVeiculo: current.activeVehicleType,
+    };
+    const updatedProfiles: OperationalProfiles = {
+      ...current.operationalProfiles,
+      [current.activeVehicleType]: resetInput,
+    };
+    saveOperationalProfiles(updatedProfiles);
+    saveOperational(resetInput);
   }, []);
 
   const setActiveVehicleType = useCallback((type: VehicleType) => {
@@ -512,7 +592,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "ADD_TRANSACTION", transaction: custoTx });
       saveTransaction(ganhoTx);
       saveTransaction(custoTx);
-      // Usa o config atual via ref para criar a entrada da caixinha
       const config = stateRef.current.caixinha.config;
       const entry = createCaixinhaEntry(record, config);
       dispatch({ type: "ADD_CAIXINHA_ENTRY", entry });

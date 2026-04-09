@@ -33,14 +33,11 @@ export default function OperationalScreen() {
 
   const handleSwitchVehicle = (i: number) => {
     const newType = vehicleOptions[i];
+    // Ao trocar o tipo, carrega o perfil operacional salvo daquele tipo
+    // setActiveVehicleType já atualiza o operationalInput no contexto com o perfil salvo
     setActiveVehicleType(newType);
-    setOperational({
-      ...input,
-      tipoVeiculo: newType,
-      precoCombustivel: activeProfile.precoEnergia,
-      autonomia: activeProfile.autonomia,
-      margemDesejadaPorKm: activeProfile.margemDesejada,
-    });
+    // Incrementar resetKey para sincronizar os campos visuais com o novo perfil
+    setResetKey((k) => k + 1);
   };
 
   const usingRealCost = input.gastoAbastecimento > 0;

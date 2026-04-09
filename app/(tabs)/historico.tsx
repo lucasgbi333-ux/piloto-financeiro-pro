@@ -238,7 +238,7 @@ export default function HistoricoScreen() {
             <Text style={styles.summaryValue}>{totalKm.toFixed(0)} km</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Combustível</Text>
+            <Text style={styles.summaryLabel}>Combust./Recarga</Text>
             <Text style={[styles.summaryValue, { color: "#FF9500" }]}>{fmt(totalCusto)}</Text>
           </View>
           <View style={styles.summaryCard}>

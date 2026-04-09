@@ -70,3 +70,5 @@
 - [x] Tornar percentuais da Caixinha configuráveis pelo usuário (manutenção e reserva)
 - [x] Remover campo de data do Operacional
 - [x] Expandir modal de Lançamentos com todos os campos do Operacional
+- [x] Perfis separados Combustão/Elétrico no Operacional (campos independentes por tipo)
+- [x] Corrigir rótulo "Combust./Recarga" no Histórico (combustível ou recarga elétrica)
