@@ -59,3 +59,5 @@
 - [x] Sincronizar exclusão de lançamento com Dashboard
 - [x] Atualizar navegação para 4 tabs (Dashboard, Fixos, Lançamentos, Histórico)
 - [x] Recolocar aba Operacional com ícone moderno na navegação
+- [x] Adicionar botão Limpar na aba Operacional com confirmação
+- [x] Ao limpar Operacional, zerar campos do dia e atualizar Dashboard

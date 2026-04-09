@@ -142,7 +142,8 @@ type Action =
   | { type: "ADD_DAILY_RECORD"; record: DailyRecord }
   | { type: "DELETE_DAILY_RECORD"; date: string }
   | { type: "ADD_TRANSACTION"; transaction: Transaction }
-  | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter };
+  | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter }
+  | { type: "RESET_OPERATIONAL" };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -262,6 +263,16 @@ function reducer(state: AppState, action: Action): AppState {
         reports: groupReports(state.dailyRecords, action.filter, state.fixedCostResult.custoFixoDiario),
       };
     }
+    case "RESET_OPERATIONAL": {
+      // Reseta os campos do dia operacional e recalcula o dashboard com valores zerados
+      const or2 = calculateOperationalCost(defaultOperationalInput, state.activeProfile, state.fixedCostResult.custoFixoDiario);
+      return {
+        ...state,
+        operationalInput: defaultOperationalInput,
+        operationalResult: or2,
+        dashboard: computeDashboard(state.fixedCostResult, or2),
+      };
+    }
     default:
       return state;
   }
@@ -272,6 +283,7 @@ interface AppContextValue {
   state: AppState;
   setFixedCosts: (input: FixedCostInput) => void;
   setOperational: (input: OperationalInput) => void;
+  resetOperational: () => void;
   setActiveVehicleType: (type: VehicleType) => void;
   saveVehicleProfileAction: (profile: VehicleProfile) => void;
   addDailyRecord: (record: DailyRecord) => void;
@@ -322,6 +334,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveOperational(input);
   }, []);
 
+  const resetOperational = useCallback(() => {
+    dispatch({ type: "RESET_OPERATIONAL" });
+    saveOperational(defaultOperationalInput);
+  }, []);
+
   const setActiveVehicleType = useCallback((type: VehicleType) => {
     dispatch({ type: "SET_ACTIVE_VEHICLE_TYPE", vehicleType: type });
     saveActiveVehicleType(type);
@@ -368,6 +385,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         state,
         setFixedCosts,
         setOperational,
+        resetOperational,
         setActiveVehicleType,
         saveVehicleProfileAction,
         addDailyRecord,

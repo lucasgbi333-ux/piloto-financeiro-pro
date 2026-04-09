@@ -1,5 +1,5 @@
 import {
-  ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform, TextInput,
+  ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform, TextInput, Alert,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { InputField } from "@/components/ui/input-field";
@@ -18,7 +18,7 @@ function fmtKm(val: number): string {
 }
 
 export default function OperationalScreen() {
-  const { state, setOperational, setActiveVehicleType, recordDayWithTransactions } = useApp();
+  const { state, setOperational, setActiveVehicleType, recordDayWithTransactions, resetOperational } = useApp();
   const { operationalInput: input, operationalResult: result, activeProfile } = state;
 
   // Data editável para o registro
@@ -45,6 +45,25 @@ export default function OperationalScreen() {
   };
 
   const usingRealCost = input.gastoAbastecimento > 0;
+
+  const handleClear = () => {
+    Alert.alert(
+      "Limpar Dados do Dia",
+      "Isso vai zerar todos os campos operacionais e atualizar o Dashboard. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Limpar",
+          style: "destructive",
+          onPress: () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            resetOperational();
+            setSelectedDate(new Date().toISOString().split("T")[0]);
+          },
+        },
+      ]
+    );
+  };
 
   const handleSaveDay = () => {
     if (Platform.OS !== "web") {
@@ -229,9 +248,14 @@ export default function OperationalScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveDay} activeOpacity={0.8}>
-          <Text style={styles.saveButtonText}>Salvar Dia nos Relatórios</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClear} activeOpacity={0.8}>
+            <Text style={styles.clearButtonText}>Limpar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveDay} activeOpacity={0.8}>
+            <Text style={styles.saveButtonText}>Salvar Dia</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </ScreenContainer>
   );
@@ -271,9 +295,18 @@ const styles = StyleSheet.create({
   },
   dateSectionLabel: { color: "#FFFFFF", fontSize: 16, fontWeight: "600", marginBottom: 8 },
   dateSectionHint: { color: "#8E8E93", fontSize: 12, lineHeight: 18, marginTop: 4 },
+  buttonRow: {
+    flexDirection: "row", gap: 12, marginBottom: 20,
+  },
+  clearButton: {
+    flex: 1, backgroundColor: "#1C1C1E", borderRadius: 14,
+    paddingVertical: 16, alignItems: "center",
+    borderWidth: 1, borderColor: "#FF453A",
+  },
+  clearButtonText: { color: "#FF453A", fontSize: 17, fontWeight: "700" },
   saveButton: {
-    backgroundColor: "#00D4AA", borderRadius: 14,
-    paddingVertical: 16, alignItems: "center", marginBottom: 20,
+    flex: 2, backgroundColor: "#00D4AA", borderRadius: 14,
+    paddingVertical: 16, alignItems: "center",
   },
   saveButtonText: { color: "#000000", fontSize: 17, fontWeight: "700" },
   dateInputRow: {
