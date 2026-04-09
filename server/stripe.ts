@@ -134,6 +134,9 @@ export function registerStripeRoutes(app: Express) {
         mode: "subscription",
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
+        subscription_data: {
+          trial_period_days: 7,
+        },
         success_url: `${origin}/login?success=true`,
         cancel_url: `${origin}/login?canceled=true`,
         metadata: { email },

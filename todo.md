@@ -106,3 +106,5 @@
 - [x] Stripe: tela de paywall (bloquear acesso se ativo=false, mostrar botão Assinar)
 - [x] Stripe: controle de acesso no frontend (verificar status de assinatura após login)
 - [x] Stripe: mensagens pós-pagamento na tela de login (?success=true, ?canceled=true)
+- [x] Stripe: adicionar 7 dias de trial gratuito no checkout (subscription_data.trial_period_days: 7)
+- [x] Paywall: atualizar texto para refletir o trial gratuito de 7 dias

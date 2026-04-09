@@ -185,8 +185,14 @@ export default function LoginScreen() {
               <Text style={styles.planTitle}>Plano Mensal</Text>
             </View>
 
+            {/* Trial badge */}
+            <View style={styles.trialBadge}>
+              <MaterialIcons name="card-giftcard" size={16} color="#0A0A0A" />
+              <Text style={styles.trialBadgeText}>7 dias grátis</Text>
+            </View>
+
             <Text style={styles.planPrice}>
-              R$ 6,99<Text style={styles.planPeriod}>/mês</Text>
+              R$ 6,99<Text style={styles.planPeriod}>/mês após o trial</Text>
             </Text>
 
             <View style={styles.planFeatures}>
@@ -210,7 +216,7 @@ export default function LoginScreen() {
               ) : (
                 <>
                   <MaterialIcons name="lock-open" size={20} color="#0A0A0A" />
-                  <Text style={styles.subscribeBtnText}>Assinar Plano Mensal</Text>
+                  <Text style={styles.subscribeBtnText}>Iniciar 7 Dias Grátis</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -597,7 +603,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    marginBottom: 12,
+  },
+  trialBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#00D4AA",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
     marginBottom: 16,
+  },
+  trialBadgeText: {
+    color: "#0A0A0A",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   planTitle: {
     color: "#FFD700",
