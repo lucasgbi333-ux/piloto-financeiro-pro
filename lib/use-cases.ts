@@ -3,6 +3,8 @@ import type {
   FixedCostResult,
   OperationalInput,
   OperationalResult,
+  RealCostInput,
+  RealCostResult,
   DailyRecord,
   ReportItem,
   PeriodFilter,
@@ -96,6 +98,45 @@ export function calculateOperationalCost(input: OperationalInput): OperationalRe
     lucroPorKm,
     lucroDia,
     valorMinimoKm,
+  };
+}
+
+// ===== MÓDULO 2B: CUSTO REAL (RealCostUseCase) =====
+/**
+ * Calcula o custo e lucro por KM com base em dados REAIS de abastecimento.
+ * Regra: custoPorKmReal = valorAbastecido / kmRodado
+ *        lucroPorKmReal = valorPorKmRecebido - custoPorKmReal
+ *
+ * Validações:
+ * - kmRodado <= 0 → erro (evita divisão por zero)
+ * - valorAbastecido <= 0 → erro (dados inválidos)
+ */
+export function calculateRealCost(input: RealCostInput): RealCostResult {
+  if (input.kmRodado <= 0) {
+    return {
+      custoPorKmReal: 0,
+      lucroPorKmReal: 0,
+      isValid: false,
+      errorMessage: "KM rodado deve ser maior que zero.",
+    };
+  }
+
+  if (input.valorAbastecido <= 0) {
+    return {
+      custoPorKmReal: 0,
+      lucroPorKmReal: 0,
+      isValid: false,
+      errorMessage: "Valor abastecido deve ser maior que zero.",
+    };
+  }
+
+  const custoPorKmReal = input.valorAbastecido / input.kmRodado;
+  const lucroPorKmReal = input.valorPorKmRecebido - custoPorKmReal;
+
+  return {
+    custoPorKmReal,
+    lucroPorKmReal,
+    isValid: true,
   };
 }
 
