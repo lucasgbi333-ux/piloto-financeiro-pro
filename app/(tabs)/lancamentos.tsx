@@ -1,5 +1,5 @@
 import {
-  Text, View, StyleSheet, TouchableOpacity, Modal, ScrollView, Platform, TextInput,
+  Text, View, StyleSheet, TouchableOpacity, Modal, ScrollView, Platform, TextInput, Alert,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
@@ -169,6 +169,29 @@ export default function LancamentosScreen() {
     setKmRodado(0);
     setGanho(0);
     setGastoAbastecimento(0);
+  };
+
+  const handleClear = () => {
+    Alert.alert(
+      "Limpar Campos",
+      "Isso vai zerar todos os campos do lançamento. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Limpar",
+          style: "destructive",
+          onPress: () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setKmRodado(0);
+            setGanho(0);
+            setGastoAbastecimento(0);
+            setMargemDesejada(activeProfileForType.margemDesejada);
+            setPrecoCombustivel(activeProfileForType.precoEnergia);
+            setAutonomia(activeProfileForType.autonomia);
+          },
+        },
+      ]
+    );
   };
 
   const handleDelete = (date: string, vType: VehicleType) => {
@@ -532,6 +555,9 @@ export default function LancamentosScreen() {
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} activeOpacity={0.8}>
                   <Text style={styles.cancelBtnText}>Cancelar</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.8}>
+                  <Text style={styles.clearBtnText}>Limpar</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
                   <Text style={styles.saveBtnText}>Salvar Dia</Text>
                 </TouchableOpacity>
@@ -766,6 +792,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: "center",
   },
   cancelBtnText: { color: "#8E8E93", fontSize: 15, fontWeight: "600" },
+  clearBtn: {
+    flex: 1, backgroundColor: "#1C1C1E", borderRadius: 12,
+    paddingVertical: 14, alignItems: "center",
+    borderWidth: 1, borderColor: "#FF453A",
+  },
+  clearBtnText: { color: "#FF453A", fontSize: 15, fontWeight: "600" },
   saveBtn: {
     flex: 2, backgroundColor: "#00D4AA", borderRadius: 12,
     paddingVertical: 14, alignItems: "center",
