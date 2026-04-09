@@ -48,6 +48,7 @@ const defaultOperationalInput: OperationalInput = {
   kmRodadoDia: 0,
   ganhoDia: 0,
   margemDesejadaPorKm: 0,
+  gastoAbastecimento: 0,
 };
 
 function computeDashboard(

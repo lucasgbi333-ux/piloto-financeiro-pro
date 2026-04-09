@@ -24,12 +24,6 @@ export default function OperationalScreen() {
     setOperational({ ...input, ...partial });
   };
 
-  const parseNum = (text: string): number => {
-    const cleaned = text.replace(",", ".");
-    const val = parseFloat(cleaned);
-    return isNaN(val) ? 0 : val;
-  };
-
   const vehicleOptions: VehicleType[] = ["COMBUSTAO", "ELETRICO"];
   const vehicleIndex = vehicleOptions.indexOf(input.tipoVeiculo);
 
@@ -38,11 +32,16 @@ export default function OperationalScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     const today = new Date().toISOString().split("T")[0];
+    // Custo do dia = custo por km * km rodados + gasto real com abastecimento (se informado)
+    const custoFinal =
+      input.gastoAbastecimento > 0
+        ? input.gastoAbastecimento
+        : result.custoTotalDia;
     addDailyRecord({
       date: today,
       kmRodado: input.kmRodadoDia,
       ganho: input.ganhoDia,
-      custo: result.custoTotalDia,
+      custo: custoFinal,
     });
   };
 
@@ -68,43 +67,69 @@ export default function OperationalScreen() {
 
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (L)" : "Preço kWh"}
-            value={input.precoCombustivel > 0 ? String(input.precoCombustivel) : ""}
-            onChangeText={(t) => update({ precoCombustivel: parseNum(t) })}
+            value={input.precoCombustivel}
+            onChangeValue={(n) => update({ precoCombustivel: n })}
             placeholder="0,00"
             suffix="R$"
           />
 
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Autonomia (km/L)" : "Autonomia (km/kWh)"}
-            value={input.autonomia > 0 ? String(input.autonomia) : ""}
-            onChangeText={(t) => update({ autonomia: parseNum(t) })}
+            value={input.autonomia}
+            onChangeValue={(n) => update({ autonomia: n })}
             placeholder="0"
             suffix={input.tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
           />
 
           <InputField
             label="KM Rodados Hoje"
-            value={input.kmRodadoDia > 0 ? String(input.kmRodadoDia) : ""}
-            onChangeText={(t) => update({ kmRodadoDia: parseNum(t) })}
+            value={input.kmRodadoDia}
+            onChangeValue={(n) => update({ kmRodadoDia: n })}
             placeholder="0"
             suffix="km"
           />
 
           <InputField
             label="Ganho do Dia"
-            value={input.ganhoDia > 0 ? String(input.ganhoDia) : ""}
-            onChangeText={(t) => update({ ganhoDia: parseNum(t) })}
+            value={input.ganhoDia}
+            onChangeValue={(n) => update({ ganhoDia: n })}
             placeholder="0,00"
             suffix="R$"
           />
 
           <InputField
             label="Margem Desejada por KM"
-            value={input.margemDesejadaPorKm > 0 ? String(input.margemDesejadaPorKm) : ""}
-            onChangeText={(t) => update({ margemDesejadaPorKm: parseNum(t) })}
+            value={input.margemDesejadaPorKm}
+            onChangeValue={(n) => update({ margemDesejadaPorKm: n })}
             placeholder="0,00"
             suffix="R$/km"
           />
+        </View>
+
+        {/* Seção de gasto real com combustível/recarga */}
+        <View style={styles.fuelSection}>
+          <Text style={styles.fuelTitle}>
+            {input.tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
+          </Text>
+          <Text style={styles.fuelSubtitle}>
+            {input.tipoVeiculo === "COMBUSTAO"
+              ? "Informe o valor gasto no abastecimento (ex: R$ 70,00)"
+              : "Informe o valor gasto na recarga elétrica (ex: R$ 50,00)"}
+          </Text>
+          <InputField
+            label={input.tipoVeiculo === "COMBUSTAO" ? "Valor Abastecido" : "Valor Recarregado"}
+            value={input.gastoAbastecimento}
+            onChangeValue={(n) => update({ gastoAbastecimento: n })}
+            placeholder="0,00 (opcional)"
+            suffix="R$"
+          />
+          {input.gastoAbastecimento > 0 && (
+            <View style={styles.fuelNote}>
+              <Text style={styles.fuelNoteText}>
+                ✓ O custo real de {fmt(input.gastoAbastecimento)} será usado ao salvar o dia
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.resultsSection}>
@@ -117,8 +142,13 @@ export default function OperationalScreen() {
           />
           <ResultCard
             icon="payments"
-            title="Custo Total do Dia"
+            title="Custo Total do Dia (estimado)"
             value={fmt(result.custoTotalDia)}
+            subtitle={
+              input.gastoAbastecimento > 0
+                ? `Custo real informado: ${fmt(input.gastoAbastecimento)}`
+                : "Baseado no preço e km rodados"
+            }
             accentColor="#FF453A"
           />
           <ResultCard
@@ -141,7 +171,7 @@ export default function OperationalScreen() {
           onPress={handleSaveDay}
           activeOpacity={0.8}
         >
-          <Text style={styles.saveButtonText}>Salvar Dia</Text>
+          <Text style={styles.saveButtonText}>Salvar Dia nos Relatórios</Text>
         </TouchableOpacity>
       </ScrollView>
     </ScreenContainer>
@@ -170,7 +200,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 8,
   },
   sectionLabel: {
     color: "#8E8E93",
@@ -179,6 +209,37 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 8,
+  },
+  fuelSection: {
+    backgroundColor: "#111111",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: "#1C1C1E",
+  },
+  fuelTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  fuelSubtitle: {
+    color: "#8E8E93",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  fuelNote: {
+    backgroundColor: "rgba(0, 212, 170, 0.1)",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: -4,
+  },
+  fuelNoteText: {
+    color: "#00D4AA",
+    fontSize: 13,
+    fontWeight: "500",
   },
   resultsSection: {
     marginBottom: 24,

@@ -58,6 +58,7 @@ describe("calculateOperationalCost", () => {
       kmRodadoDia: 200,
       ganhoDia: 300,
       margemDesejadaPorKm: 0.5,
+      gastoAbastecimento: 0,
     };
     const result = calculateOperationalCost(input);
     // cok = 6/12 = 0.5
@@ -78,6 +79,7 @@ describe("calculateOperationalCost", () => {
       kmRodadoDia: 150,
       ganhoDia: 250,
       margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 0,
     };
     const result = calculateOperationalCost(input);
     // cok = 0.8/6 = 0.1333
@@ -98,6 +100,7 @@ describe("calculateOperationalCost", () => {
       kmRodadoDia: 100,
       ganhoDia: 200,
       margemDesejadaPorKm: 0.5,
+      gastoAbastecimento: 0,
     };
     const result = calculateOperationalCost(input);
     expect(result.custoPorKm).toBe(0);

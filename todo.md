@@ -24,3 +24,6 @@
 - [x] Integração entre módulos (dados fluem entre telas)
 - [x] Gerar logo do app
 - [x] Atualizar app.config.ts com branding
+- [x] Corrigir bug de inputs que não aceitam ponto e vírgula
+- [x] Adicionar campo de gasto com combustível/recarga no módulo Operacional
+- [x] Adicionar card de custo diário para cobrir custos mensais na aba Custos Fixos

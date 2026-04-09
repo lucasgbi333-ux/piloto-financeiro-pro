@@ -19,12 +19,6 @@ export default function FixedCostsScreen() {
     setFixedCosts({ ...input, ...partial });
   };
 
-  const parseNum = (text: string): number => {
-    const cleaned = text.replace(",", ".");
-    const val = parseFloat(cleaned);
-    return isNaN(val) ? 0 : val;
-  };
-
   const rentalOptions: RentalType[] = ["SEMANAL", "MENSAL"];
   const rentalIndex = rentalOptions.indexOf(input.tipoAluguel);
 
@@ -37,22 +31,22 @@ export default function FixedCostsScreen() {
       >
         <Text style={styles.title}>Custos Fixos</Text>
         <Text style={styles.subtitle}>
-          Configure seus custos fixos mensais para calcular quanto precisa gerar por dia.
+          Configure seus custos fixos para calcular quanto precisa gerar por dia.
         </Text>
 
         <View style={styles.section}>
           <InputField
             label="IPVA Anual"
-            value={input.ipvaAnual > 0 ? String(input.ipvaAnual) : ""}
-            onChangeText={(t) => update({ ipvaAnual: parseNum(t) })}
+            value={input.ipvaAnual}
+            onChangeValue={(n) => update({ ipvaAnual: n })}
             placeholder="0,00"
             suffix="R$"
           />
 
           <InputField
             label="Financiamento Mensal"
-            value={input.financiamentoMensal > 0 ? String(input.financiamentoMensal) : ""}
-            onChangeText={(t) => update({ financiamentoMensal: parseNum(t) })}
+            value={input.financiamentoMensal}
+            onChangeValue={(n) => update({ financiamentoMensal: n })}
             placeholder="0,00 (opcional)"
             suffix="R$"
           />
@@ -66,24 +60,24 @@ export default function FixedCostsScreen() {
 
           <InputField
             label="Valor do Aluguel"
-            value={input.aluguelValor > 0 ? String(input.aluguelValor) : ""}
-            onChangeText={(t) => update({ aluguelValor: parseNum(t) })}
+            value={input.aluguelValor}
+            onChangeValue={(n) => update({ aluguelValor: n })}
             placeholder="0,00 (opcional)"
             suffix="R$"
           />
 
           <InputField
             label="Internet Mensal"
-            value={input.internetMensal > 0 ? String(input.internetMensal) : ""}
-            onChangeText={(t) => update({ internetMensal: parseNum(t) })}
+            value={input.internetMensal}
+            onChangeValue={(n) => update({ internetMensal: n })}
             placeholder="0,00"
             suffix="R$"
           />
 
           <InputField
             label="Outros Custos"
-            value={input.outrosCustos > 0 ? String(input.outrosCustos) : ""}
-            onChangeText={(t) => update({ outrosCustos: parseNum(t) })}
+            value={input.outrosCustos}
+            onChangeValue={(n) => update({ outrosCustos: n })}
             placeholder="0,00"
             suffix="R$"
           />
@@ -91,24 +85,37 @@ export default function FixedCostsScreen() {
 
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Resultados</Text>
+
           <ResultCard
             icon="calendar-today"
-            title="Custo Mensal"
+            title="Custo Mensal Total"
             value={fmt(result.custoMensalTotal)}
             accentColor="#0A84FF"
           />
+
           <ResultCard
             icon="date-range"
-            title="Custo Anual"
+            title="Custo Anual Total"
             value={fmt(result.custoAnualTotal)}
             accentColor="#FF9500"
           />
+
+          {/* Necessário por dia para cobrir custos mensais */}
           <ResultCard
             icon="today"
-            title="Necessário por Dia"
+            title="Necessário por Dia (Mensal)"
             value={fmt(result.custoDiarioNecessario)}
-            subtitle="Para cobrir seus custos fixos"
+            subtitle="Para cobrir seus custos do mês atual"
             accentColor="#00D4AA"
+          />
+
+          {/* Necessário por dia para cobrir custos anuais */}
+          <ResultCard
+            icon="event-available"
+            title="Necessário por Dia (Anual)"
+            value={fmt(result.custoAnualTotal / 365)}
+            subtitle="Para cobrir todos os custos do ano"
+            accentColor="#30D158"
           />
         </View>
       </ScrollView>

@@ -26,6 +26,8 @@ export interface OperationalInput {
   kmRodadoDia: number;
   ganhoDia: number;
   margemDesejadaPorKm: number;
+  /** Valor gasto em abastecimento ou recarga elétrica no dia */
+  gastoAbastecimento: number;
 }
 
 export interface OperationalResult {
