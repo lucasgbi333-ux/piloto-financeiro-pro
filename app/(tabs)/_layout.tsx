@@ -1,15 +1,37 @@
+import { useEffect } from "react";
 import { Tabs } from "expo-router";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform } from "react-native";
+import { Platform, ActivityIndicator, View } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
+  const { session, loading } = useSupabaseAuth();
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.replace("/login");
+    }
+  }, [loading, session]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0A0A0A" }}>
+        <ActivityIndicator size="large" color="#00D4AA" />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <Tabs

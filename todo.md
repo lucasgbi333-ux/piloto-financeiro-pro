@@ -89,3 +89,9 @@
 - [x] Lançamentos: integrar seletor de perfil individual (Combustão/Elétrico) com todos os campos do Operacional no modal
 - [x] Excluir aba Operacional da navegação e do projeto
 - [x] Lançamentos: botão Limpar no modal para zerar todos os campos com confirmação
+- [x] Tela de Login: campo email, campo senha (oculta), botão Entrar, Criar conta, Esqueci senha
+- [x] Login: validação de campos, Supabase Auth com email/senha, redirecionamento
+- [x] Cadastro: criar usuário no Supabase, login automático após criar
+- [x] Recuperação de senha: solicitar email, enviar link via Supabase
+- [x] Sessão persistente: manter logado, pular login se já autenticado
+- [x] Design moderno e minimalista com feedback visual (loading)
