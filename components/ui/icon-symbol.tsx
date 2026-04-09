@@ -29,6 +29,9 @@ const MAPPING = {
   "square.grid.2x2.fill": "dashboard",
   "calendar": "calendar-today",
   "clock.arrow.circlepath": "history",
+  "gauge.badge.plus": "add-road",
+  "car.circle.fill": "commute",
+  "steeringwheel": "drive-eta",
 } as IconMapping;
 
 export function IconSymbol({
