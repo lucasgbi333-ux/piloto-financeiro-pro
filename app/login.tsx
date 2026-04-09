@@ -13,16 +13,29 @@ type Mode = "login" | "signup" | "reset";
 export default function LoginScreen() {
   const { signIn, signUp, resetPassword } = useSupabaseAuth();
   const [mode, setMode] = useState<Mode>("login");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const nameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
-  const isValid = mode === "reset"
-    ? email.trim().length > 0
-    : email.trim().length > 0 && password.length >= 6;
+  const isValid = (() => {
+    if (mode === "reset") return email.trim().length > 0;
+    if (mode === "signup") return fullName.trim().length > 0 && email.trim().length > 0 && password.length >= 6;
+    return email.trim().length > 0 && password.length >= 6;
+  })();
+
+  const hapticError = () => {
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  };
+  const hapticSuccess = () => {
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -35,46 +48,47 @@ export default function LoginScreen() {
         const { error } = await signIn(email.trim(), password);
         if (error) {
           setErrorMsg(error);
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          hapticError();
         } else {
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          hapticSuccess();
           router.replace("/(tabs)");
         }
+
       } else if (mode === "signup") {
-        const { error } = await signUp(email.trim(), password);
+        const { error, needsConfirmation } = await signUp(email.trim(), password, fullName.trim());
         if (error) {
           setErrorMsg(error);
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          hapticError();
+        } else if (needsConfirmation) {
+          hapticSuccess();
+          Alert.alert(
+            "Conta criada! ✉️",
+            "Enviamos um email de confirmação. Verifique sua caixa de entrada e clique no link para ativar sua conta.",
+            [{ text: "OK", onPress: () => switchMode("login") }]
+          );
         } else {
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          // Auto-login after signup (Supabase auto-confirms in dev, or user needs to confirm email)
-          const { error: loginError } = await signIn(email.trim(), password);
-          if (!loginError) {
-            router.replace("/(tabs)");
-          } else {
-            Alert.alert(
-              "Conta criada!",
-              "Verifique seu email para confirmar a conta e depois faça login.",
-              [{ text: "OK", onPress: () => setMode("login") }]
-            );
-          }
+          // Sessão criada automaticamente (email confirmation desabilitado)
+          hapticSuccess();
+          router.replace("/(tabs)");
         }
+
       } else if (mode === "reset") {
         const { error } = await resetPassword(email.trim());
         if (error) {
           setErrorMsg(error);
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          hapticError();
         } else {
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          hapticSuccess();
           Alert.alert(
-            "Email enviado!",
-            "Verifique sua caixa de entrada para redefinir a senha.",
-            [{ text: "OK", onPress: () => setMode("login") }]
+            "Email enviado! ✉️",
+            "Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.",
+            [{ text: "OK", onPress: () => switchMode("login") }]
           );
         }
       }
     } catch {
-      setErrorMsg("Erro de conexão. Tente novamente.");
+      setErrorMsg("Erro de conexão. Verifique sua internet e tente novamente.");
+      hapticError();
     } finally {
       setLoading(false);
     }
@@ -84,6 +98,7 @@ export default function LoginScreen() {
     setMode(newMode);
     setErrorMsg("");
     setPassword("");
+    setFullName("");
   };
 
   const title = mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar Senha";
@@ -104,6 +119,7 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           bounces={false}
+          showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View style={styles.header}>
@@ -114,10 +130,33 @@ export default function LoginScreen() {
 
           {/* Form */}
           <View style={styles.form}>
+
+            {/* Nome completo — apenas no cadastro */}
+            {mode === "signup" && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nome Completo</Text>
+                <TextInput
+                  ref={nameRef}
+                  style={styles.input}
+                  placeholder="Seu nome completo"
+                  placeholderTextColor="#555"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete="name"
+                  value={fullName}
+                  onChangeText={(t) => { setFullName(t); setErrorMsg(""); }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  editable={!loading}
+                />
+              </View>
+            )}
+
             {/* Email */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
+                ref={emailRef}
                 style={styles.input}
                 placeholder="seu@email.com"
                 placeholderTextColor="#555"
@@ -136,7 +175,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            {/* Password (hidden in reset mode) */}
+            {/* Senha — oculta no modo reset */}
             {mode !== "reset" && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Senha</Text>
@@ -149,7 +188,7 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    autoComplete="password"
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
                     value={password}
                     onChangeText={(t) => { setPassword(t); setErrorMsg(""); }}
                     returnKeyType="done"
@@ -167,14 +206,14 @@ export default function LoginScreen() {
               </View>
             )}
 
-            {/* Error message */}
+            {/* Mensagem de erro */}
             {errorMsg ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
             ) : null}
 
-            {/* Submit button */}
+            {/* Botão principal */}
             <TouchableOpacity
               style={[styles.submitBtn, !isValid && styles.submitBtnDisabled]}
               onPress={handleSubmit}
@@ -189,7 +228,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Footer links */}
+          {/* Links de navegação */}
           <View style={styles.footer}>
             {mode === "login" && (
               <>
@@ -204,12 +243,16 @@ export default function LoginScreen() {
             )}
             {mode === "signup" && (
               <TouchableOpacity onPress={() => switchMode("login")} activeOpacity={0.7}>
-                <Text style={styles.linkText}>Já tenho conta — <Text style={styles.linkTextAccent}>Entrar</Text></Text>
+                <Text style={styles.linkText}>
+                  Já tenho conta — <Text style={styles.linkTextAccent}>Entrar</Text>
+                </Text>
               </TouchableOpacity>
             )}
             {mode === "reset" && (
               <TouchableOpacity onPress={() => switchMode("login")} activeOpacity={0.7}>
-                <Text style={styles.linkText}>Voltar para <Text style={styles.linkTextAccent}>Login</Text></Text>
+                <Text style={styles.linkText}>
+                  Voltar para <Text style={styles.linkTextAccent}>Login</Text>
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -297,7 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,69,58,0.12)",
     borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: "rgba(255,69,58,0.25)",
   },
@@ -306,6 +349,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
+    lineHeight: 18,
   },
   submitBtn: {
     backgroundColor: "#00D4AA",

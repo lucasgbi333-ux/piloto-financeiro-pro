@@ -95,3 +95,5 @@
 - [x] Recuperação de senha: solicitar email, enviar link via Supabase
 - [x] Sessão persistente: manter logado, pular login se já autenticado
 - [x] Design moderno e minimalista com feedback visual (loading)
+- [x] Corrigir problema de cadastro no Supabase Auth
+- [x] Adicionar campo nome completo na tela de cadastro
