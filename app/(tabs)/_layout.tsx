@@ -27,7 +27,7 @@ export default function TabLayout() {
           borderTopWidth: 0.5,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: "600",
         },
       }}
@@ -47,24 +47,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="operational"
-        options={{
-          title: "Operacional",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="car.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="vehicle-profiles"
         options={{
           title: "Perfis",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: "Histórico",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="list.bullet" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="car.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -73,6 +59,15 @@ export default function TabLayout() {
           title: "Relatórios",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.bar.fill" color={color} />,
         }}
+      />
+      {/* Abas ocultas — mantidas para não quebrar o roteamento, mas sem exibição na tab bar */}
+      <Tabs.Screen
+        name="operational"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{ href: null }}
       />
     </Tabs>
   );

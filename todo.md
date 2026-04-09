@@ -39,3 +39,8 @@
 - [x] Criar tela de Perfis de Veículo com edição separada por tipo
 - [x] Atualizar Relatórios para usar dados reais do histórico
 - [x] Atualizar navegação com novas tabs/telas
+- [x] Enriquecer tela Perfis com custo/km, lucro/km, mínimo/km e registro do dia
+- [x] Unificar Histórico de Transações dentro de Relatórios
+- [x] Remover aba Operacional
+- [x] Remover aba Histórico
+- [x] Atualizar navegação para 4 tabs (Dashboard, Fixos, Perfis, Relatórios)
