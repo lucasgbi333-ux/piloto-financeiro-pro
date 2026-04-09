@@ -123,3 +123,11 @@
 - [x] Diagnosticar webhook: verificar se evento customer.subscription.created está chegando ao servidor
 - [x] Criar endpoint POST /api/stripe/activate para ativar assinatura diretamente via Stripe API
 - [x] Atualizar checkout-success.tsx para usar ativação direta via Stripe API (sem depender do webhook)
+- [x] Criar contexto/store RadarGanhos com AsyncStorage (semáforo, apps, overlay settings)
+- [x] Criar tela principal aba Radar de Ganhos com seções: Semáforo, Apps, Ferramentas, Customização
+- [x] Implementar seção Semáforo de Valores com switch mestre e ajustes -/+ para Km, Hora, Nota
+- [x] Implementar seção Ativação e Apps com switches Uber, 99, InDrive e link Histórico
+- [x] Implementar seção Ferramentas com switch Captura de Tela
+- [x] Implementar seção Customização do Pop-up com switches e sliders (fonte, transparência, duração)
+- [x] Registrar aba Radar de Ganhos no tab layout com ícone
+- [x] Criar tela Histórico de Chamadas

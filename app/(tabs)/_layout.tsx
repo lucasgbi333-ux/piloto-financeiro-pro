@@ -111,7 +111,18 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="radar-ganhos"
+        options={{
+          title: "Radar",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="antenna.radiowaves.left.and.right" color={color} />
+          ),
+        }}
+      />
+
       {/* Telas ocultas da tab bar */}
+      <Tabs.Screen name="historico-chamadas" options={{ href: null }} />
       <Tabs.Screen name="vehicle-profiles" options={{ href: null }} />
       <Tabs.Screen name="reports" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />

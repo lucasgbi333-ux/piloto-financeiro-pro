@@ -33,6 +33,7 @@ const MAPPING = {
   "car.circle.fill": "commute",
   "steeringwheel": "drive-eta",
   "banknote.fill": "savings",
+  "antenna.radiowaves.left.and.right": "radar",
 } as IconMapping;
 
 export function IconSymbol({
