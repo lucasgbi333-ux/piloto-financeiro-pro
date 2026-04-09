@@ -139,6 +139,8 @@ const config: ExpoConfig = {
         },
       },
     ],
+    // Config plugin para permissões do Radar de Ganhos (overlay + accessibility)
+    "./plugins/withRadarOverlay",
   ],
   experiments: {
     typedRoutes: true,

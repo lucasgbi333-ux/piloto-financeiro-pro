@@ -134,3 +134,10 @@
 - [x] Criar módulo de verificação de permissões SYSTEM_ALERT_WINDOW e Accessibility Service
 - [x] Adicionar banner de alerta na tela Radar de Ganhos quando permissões estiverem ausentes
 - [x] Botão "Conceder permissão" que abre as configurações corretas do Android via Linking
+- [x] Migrar projeto para Expo Dev Build (config plugin + prebuild)
+- [x] Configurar AndroidManifest.xml com SYSTEM_ALERT_WINDOW e BIND_ACCESSIBILITY_SERVICE
+- [x] Criar módulo Kotlin: AccessibilityService para captura de dados de notificações Uber/99/InDrive
+- [x] Criar módulo Kotlin: WindowManager overlay com UI glassmorphism premium
+- [x] Criar bridge React Native (JS ↔ Kotlin) para comunicação bidirecional
+- [x] Integrar lógica de cálculo e semáforo com o módulo nativo
+- [x] Gerar instruções para build APK de desenvolvimento

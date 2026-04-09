@@ -29,6 +29,7 @@ import {
   markOverlayPermissionGranted,
   markAccessibilityPermissionGranted,
 } from "@/lib/overlay-permissions";
+import RadarOverlay from "@/modules/radar-overlay";
 
 // ─── Colors ───
 const C = {
@@ -303,27 +304,64 @@ export default function RadarGanhosScreen() {
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [accessibilityGranted, setAccessibilityGranted] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const nativeAvailable = RadarOverlay.isAvailable();
 
-  // Carrega o estado de permissões do AsyncStorage
+  // Carrega o estado de permissões
   useEffect(() => {
     if (!isAndroid) {
       setPermissionsLoaded(true);
       return;
     }
-    Promise.all([
-      getOverlayPermissionGranted(),
-      getAccessibilityPermissionGranted(),
-    ]).then(([overlay, accessibility]) => {
-      setOverlayGranted(overlay);
-      setAccessibilityGranted(accessibility);
+    // Se o módulo nativo está disponível, usa a API real
+    if (nativeAvailable) {
+      setOverlayGranted(RadarOverlay.canDrawOverlays());
+      setAccessibilityGranted(RadarOverlay.isAccessibilityServiceRunning());
       setPermissionsLoaded(true);
-    });
+    } else {
+      // Fallback: usa AsyncStorage (Expo Go)
+      Promise.all([
+        getOverlayPermissionGranted(),
+        getAccessibilityPermissionGranted(),
+      ]).then(([overlay, accessibility]) => {
+        setOverlayGranted(overlay);
+        setAccessibilityGranted(accessibility);
+        setPermissionsLoaded(true);
+      });
+    }
   }, []);
 
-  // Abre configurações de overlay e aguarda o usuário confirmar
+  // Sincroniza configurações com o módulo nativo quando mudam
+  useEffect(() => {
+    if (!nativeAvailable) return;
+    RadarOverlay.syncAllSettings({
+      semaforoEnabled: state.semaforoEnabled,
+      limiteKmRuim: state.ganhosPorKm.ruim,
+      limiteKmBom: state.ganhosPorKm.bom,
+      limiteHoraRuim: state.ganhosPorHora.ruim,
+      limiteHoraBom: state.ganhosPorHora.bom,
+      limiteNotaRuim: state.notaPassageiro.ruim,
+      limiteNotaBom: state.notaPassageiro.bom,
+      appUber: state.uberEnabled,
+      app99: state.app99Enabled,
+      appIndriver: state.indriveEnabled,
+      capturaTelaEnabled: state.capturaTelaEnabled,
+      overlayFontSize: state.overlayFontSize,
+      overlayTransparency: state.overlayTransparencia,
+      overlayDuration: state.overlayDuracao,
+      overlayShowKm: state.overlayGanhosPorKm,
+      overlayShowHour: state.overlayGanhosPorHora,
+      overlayShowMinute: state.overlayGanhosPorMinuto,
+      overlayShowRating: state.overlayNotaPassageiro,
+    });
+  }, [state, nativeAvailable]);
+
+  // Abre configurações de overlay
   async function handleGrantOverlay() {
-    await openOverlaySettings();
-    // Após abrir as configurações, mostra alerta pedindo confirmação
+    if (nativeAvailable) {
+      RadarOverlay.requestOverlayPermission();
+    } else {
+      await openOverlaySettings();
+    }
     Alert.alert(
       "Permissão concedida?",
       "Após ativar 'Exibir sobre outros apps' nas configurações, toque em 'Sim' para confirmar.",
@@ -332,17 +370,25 @@ export default function RadarGanhosScreen() {
         {
           text: "Sim, concedi",
           onPress: async () => {
-            await markOverlayPermissionGranted(true);
-            setOverlayGranted(true);
+            if (nativeAvailable) {
+              setOverlayGranted(RadarOverlay.canDrawOverlays());
+            } else {
+              await markOverlayPermissionGranted(true);
+              setOverlayGranted(true);
+            }
           },
         },
       ]
     );
   }
 
-  // Abre configurações de acessibilidade e aguarda o usuário confirmar
+  // Abre configurações de acessibilidade
   async function handleGrantAccessibility() {
-    await openAccessibilitySettings();
+    if (nativeAvailable) {
+      RadarOverlay.openAccessibilitySettings();
+    } else {
+      await openAccessibilitySettings();
+    }
     Alert.alert(
       "Serviço ativado?",
       "Após ativar o Piloto Financeiro Pro em Serviços de Acessibilidade, toque em 'Sim' para confirmar.",
@@ -351,12 +397,43 @@ export default function RadarGanhosScreen() {
         {
           text: "Sim, ativei",
           onPress: async () => {
-            await markAccessibilityPermissionGranted(true);
-            setAccessibilityGranted(true);
+            if (nativeAvailable) {
+              setAccessibilityGranted(RadarOverlay.isAccessibilityServiceRunning());
+            } else {
+              await markAccessibilityPermissionGranted(true);
+              setAccessibilityGranted(true);
+            }
           },
         },
       ]
     );
+  }
+
+  // Função para testar o overlay
+  function handleTestOverlay() {
+    if (!nativeAvailable) {
+      Alert.alert(
+        "Dev Build necessário",
+        "O teste do overlay só funciona no APK de desenvolvimento (Dev Build). No Expo Go, o módulo nativo não está disponível."
+      );
+      return;
+    }
+    const success = RadarOverlay.testOverlay({
+      semaphoreColor: "green",
+      fontSize: state.overlayFontSize,
+      transparency: state.overlayTransparencia,
+      duration: state.overlayDuracao,
+      showKm: state.overlayGanhosPorKm,
+      showHour: state.overlayGanhosPorHora,
+      showMinute: state.overlayGanhosPorMinuto,
+      showRating: state.overlayNotaPassageiro,
+    });
+    if (!success) {
+      Alert.alert(
+        "Permissão necessária",
+        "Conceda a permissão 'Exibir sobre outros apps' para testar o overlay."
+      );
+    }
   }
 
   // Determina se deve exibir os banners de permissão
@@ -640,6 +717,25 @@ export default function RadarGanhosScreen() {
             onValueChange={(v) => setOverlaySlider("overlayDuracao", Math.round(v))}
           />
         </View>
+
+        {/* Botão de Teste do Overlay */}
+        {isAndroid && (
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== "web") {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+              handleTestOverlay();
+            }}
+            style={({ pressed }) => [
+              styles.testButton,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+            ]}
+          >
+            <MaterialIcons name="play-circle-outline" size={22} color="#000" />
+            <Text style={styles.testButtonText}>Testar Overlay</Text>
+          </Pressable>
+        )}
 
         {/* Bottom spacer */}
         <View style={{ height: 40 }} />
@@ -960,5 +1056,23 @@ const styles = StyleSheet.create({
     color: "#22C55E",
     fontSize: 13,
     fontWeight: "600",
+  },
+
+  testButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: C.orange,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  testButtonText: {
+    color: "#000000",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
