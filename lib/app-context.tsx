@@ -39,6 +39,8 @@ const defaultFixedInput: FixedCostInput = {
   tipoAluguel: "MENSAL",
   internetMensal: 0,
   outrosCustos: 0,
+  seguroValor: 0,
+  tipoSeguro: "ANUAL",
 };
 
 const defaultOperationalInput: OperationalInput = {
@@ -59,7 +61,7 @@ function computeDashboard(
   return {
     minPerKm: opResult.valorMinimoKm,
     requiredDaily: fixedResult.custoDiarioNecessario,
-    dailyProfit: opInput.ganhoDia - opResult.custoTotalDia,
+    dailyProfit: opResult.lucroDia,
   };
 }
 

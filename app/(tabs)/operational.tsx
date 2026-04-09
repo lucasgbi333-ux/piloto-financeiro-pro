@@ -27,21 +27,18 @@ export default function OperationalScreen() {
   const vehicleOptions: VehicleType[] = ["COMBUSTAO", "ELETRICO"];
   const vehicleIndex = vehicleOptions.indexOf(input.tipoVeiculo);
 
+  const usingRealCost = input.gastoAbastecimento > 0;
+
   const handleSaveDay = () => {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     const today = new Date().toISOString().split("T")[0];
-    // Custo do dia = custo por km * km rodados + gasto real com abastecimento (se informado)
-    const custoFinal =
-      input.gastoAbastecimento > 0
-        ? input.gastoAbastecimento
-        : result.custoTotalDia;
     addDailyRecord({
       date: today,
       kmRodado: input.kmRodadoDia,
       ganho: input.ganhoDia,
-      custo: custoFinal,
+      custo: result.custoTotalDiaReal,
     });
   };
 
@@ -54,9 +51,10 @@ export default function OperationalScreen() {
       >
         <Text style={styles.title}>Custo Operacional</Text>
         <Text style={styles.subtitle}>
-          Calcule o custo por KM e o lucro do seu dia de trabalho.
+          Calcule o custo por KM e o lucro real do seu dia de trabalho.
         </Text>
 
+        {/* Tipo de veículo */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Tipo de Veículo</Text>
           <SegmentedControl
@@ -106,15 +104,15 @@ export default function OperationalScreen() {
           />
         </View>
 
-        {/* Seção de gasto real com combustível/recarga */}
+        {/* Gasto real com combustível/recarga */}
         <View style={styles.fuelSection}>
           <Text style={styles.fuelTitle}>
             {input.tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
           </Text>
           <Text style={styles.fuelSubtitle}>
             {input.tipoVeiculo === "COMBUSTAO"
-              ? "Informe o valor gasto no abastecimento (ex: R$ 70,00)"
-              : "Informe o valor gasto na recarga elétrica (ex: R$ 50,00)"}
+              ? "Quanto você gastou no posto hoje? (ex: R$ 70,00)"
+              : "Quanto você gastou na recarga elétrica hoje? (ex: R$ 50,00)"}
           </Text>
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Valor Abastecido" : "Valor Recarregado"}
@@ -123,40 +121,61 @@ export default function OperationalScreen() {
             placeholder="0,00 (opcional)"
             suffix="R$"
           />
-          {input.gastoAbastecimento > 0 && (
-            <View style={styles.fuelNote}>
-              <Text style={styles.fuelNoteText}>
-                ✓ O custo real de {fmt(input.gastoAbastecimento)} será usado ao salvar o dia
+          {usingRealCost ? (
+            <View style={styles.fuelNoteReal}>
+              <Text style={styles.fuelNoteRealText}>
+                ✓ Usando custo real: {fmt(input.gastoAbastecimento)} — lucro calculado com este valor
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.fuelNoteEstimated}>
+              <Text style={styles.fuelNoteEstimatedText}>
+                ℹ Usando custo estimado: {fmt(result.custoTotalDiaEstimado)} (preço ÷ autonomia × km)
               </Text>
             </View>
           )}
         </View>
 
+        {/* Resultados */}
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Resultados</Text>
+
           <ResultCard
             icon="speed"
-            title="Custo por KM"
+            title="Custo por KM (estimado)"
             value={fmtKm(result.custoPorKm)}
+            subtitle="Baseado no preço e autonomia"
             accentColor="#FF9500"
           />
+
           <ResultCard
-            icon="payments"
-            title="Custo Total do Dia (estimado)"
-            value={fmt(result.custoTotalDia)}
+            icon="local-gas-station"
+            title={usingRealCost ? "Custo Real do Dia" : "Custo Estimado do Dia"}
+            value={fmt(result.custoTotalDiaReal)}
             subtitle={
-              input.gastoAbastecimento > 0
-                ? `Custo real informado: ${fmt(input.gastoAbastecimento)}`
-                : "Baseado no preço e km rodados"
+              usingRealCost
+                ? `Gasto real informado: ${fmt(input.gastoAbastecimento)}`
+                : `Estimado: ${fmt(result.custoTotalDiaEstimado)}`
             }
-            accentColor="#FF453A"
+            accentColor={usingRealCost ? "#FF453A" : "#FF9500"}
           />
+
           <ResultCard
             icon="trending-up"
             title="Lucro por KM"
             value={fmtKm(result.lucroPorKm)}
+            subtitle={`Calculado com custo ${usingRealCost ? "real" : "estimado"}`}
             accentColor={result.lucroPorKm >= 0 ? "#30D158" : "#FF453A"}
           />
+
+          <ResultCard
+            icon="account-balance-wallet"
+            title="Lucro Líquido do Dia"
+            value={fmt(result.lucroDia)}
+            subtitle={`Ganho ${fmt(input.ganhoDia)} − Custo ${fmt(result.custoTotalDiaReal)}`}
+            accentColor={result.lucroDia >= 0 ? "#30D158" : "#FF453A"}
+          />
+
           <ResultCard
             icon="verified"
             title="Valor Mínimo por KM"
@@ -179,13 +198,8 @@ export default function OperationalScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  scroll: { flex: 1 },
+  content: { padding: 20, paddingBottom: 40 },
   title: {
     color: "#FFFFFF",
     fontSize: 32,
@@ -199,9 +213,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 24,
   },
-  section: {
-    marginBottom: 8,
-  },
+  section: { marginBottom: 8 },
   sectionLabel: {
     color: "#8E8E93",
     fontSize: 13,
@@ -230,20 +242,29 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 16,
   },
-  fuelNote: {
+  fuelNoteReal: {
     backgroundColor: "rgba(0, 212, 170, 0.1)",
     borderRadius: 8,
     padding: 10,
     marginTop: -4,
   },
-  fuelNoteText: {
+  fuelNoteRealText: {
     color: "#00D4AA",
     fontSize: 13,
     fontWeight: "500",
   },
-  resultsSection: {
-    marginBottom: 24,
+  fuelNoteEstimated: {
+    backgroundColor: "rgba(255, 149, 0, 0.1)",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: -4,
   },
+  fuelNoteEstimatedText: {
+    color: "#FF9500",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  resultsSection: { marginBottom: 24 },
   resultsTitle: {
     color: "#FFFFFF",
     fontSize: 22,

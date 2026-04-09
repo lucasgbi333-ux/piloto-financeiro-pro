@@ -27,3 +27,6 @@
 - [x] Corrigir bug de inputs que não aceitam ponto e vírgula
 - [x] Adicionar campo de gasto com combustível/recarga no módulo Operacional
 - [x] Adicionar card de custo diário para cobrir custos mensais na aba Custos Fixos
+- [x] Adicionar campo de seguro nos Custos Fixos (tipo e valor)
+- [x] Incluir seguro em todos os cálculos de custo fixo
+- [x] Corrigir cálculo operacional: gasto real com combustível/recarga entra no custo total do dia e lucro por KM

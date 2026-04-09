@@ -10,8 +10,10 @@ import type {
 
 // ===== MÓDULO 1: CUSTOS FIXOS =====
 export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
+  // IPVA: divide o valor anual em 12 parcelas mensais
   const ipvaMensal = input.ipvaAnual / 12;
 
+  // Aluguel: converte para mensal conforme periodicidade
   let aluguelMensal = 0;
   if (input.aluguelValor > 0) {
     aluguelMensal =
@@ -20,47 +22,79 @@ export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
         : input.aluguelValor;
   }
 
-  // Financiamento OU aluguel (não ambos)
-  const veiculoCusto =
-    input.financiamentoMensal > 0
-      ? input.financiamentoMensal
-      : aluguelMensal;
+  // Seguro: converte para mensal conforme periodicidade
+  let seguroMensal = 0;
+  if (input.seguroValor > 0) {
+    seguroMensal =
+      input.tipoSeguro === "ANUAL"
+        ? input.seguroValor / 12
+        : input.seguroValor;
+  }
 
+  // Veículo: financiamento tem prioridade sobre aluguel
+  const veiculoCusto =
+    input.financiamentoMensal > 0 ? input.financiamentoMensal : aluguelMensal;
+
+  // Total mensal = IPVA + veículo + seguro + internet + outros
   const custoMensalTotal =
-    ipvaMensal + veiculoCusto + input.internetMensal + input.outrosCustos;
+    ipvaMensal +
+    veiculoCusto +
+    seguroMensal +
+    input.internetMensal +
+    input.outrosCustos;
 
   const custoAnualTotal = custoMensalTotal * 12;
+
+  // Necessário por dia para cobrir custos mensais (mês = 30 dias)
   const custoDiarioNecessario = custoMensalTotal / 30;
+
+  // Necessário por dia para cobrir custos anuais (ano = 365 dias)
+  const custoDiarioAnual = custoAnualTotal / 365;
 
   return {
     custoMensalTotal,
     custoAnualTotal,
     custoDiarioNecessario,
+    custoDiarioAnual,
   };
 }
 
 // ===== MÓDULO 2: CUSTO OPERACIONAL =====
 export function calculateOperationalCost(input: OperationalInput): OperationalResult {
-  // Custo por KM
+  // Custo estimado por KM (baseado no preço e autonomia)
   const custoPorKm =
     input.autonomia > 0 ? input.precoCombustivel / input.autonomia : 0;
 
-  // Custo total do dia
-  const custoTotalDia = custoPorKm * input.kmRodadoDia;
+  // Custo total estimado do dia (sem gasto real)
+  const custoTotalDiaEstimado = custoPorKm * input.kmRodadoDia;
 
-  // Lucro por KM
+  // Custo total REAL do dia:
+  // Se o motorista informou o gasto real (abastecimento/recarga), usa esse valor.
+  // Caso contrário, usa o estimado.
+  const custoTotalDiaReal =
+    input.gastoAbastecimento > 0
+      ? input.gastoAbastecimento
+      : custoTotalDiaEstimado;
+
+  // Lucro líquido do dia = ganho - custo real
+  const lucroDia = input.ganhoDia - custoTotalDiaReal;
+
+  // Lucro por KM = lucro do dia / km rodados (usando custo real)
   const lucroPorKm =
     input.kmRodadoDia > 0
-      ? input.ganhoDia / input.kmRodadoDia - custoPorKm
+      ? lucroDia / input.kmRodadoDia
       : 0;
 
-  // Valor mínimo por KM (COK + margem, SEM custos fixos)
+  // Valor mínimo por KM para aceitar corrida = custo estimado/km + margem desejada
+  // (não inclui custos fixos, conforme especificação original)
   const valorMinimoKm = custoPorKm + input.margemDesejadaPorKm;
 
   return {
     custoPorKm,
-    custoTotalDia,
+    custoTotalDiaEstimado,
+    custoTotalDiaReal,
     lucroPorKm,
+    lucroDia,
     valorMinimoKm,
   };
 }
