@@ -71,16 +71,6 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="operational"
-        options={{
-          title: "Operacional",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="steeringwheel" color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
         name="caixinha"
         options={{
           title: "Caixinha",
@@ -94,6 +84,7 @@ export default function TabLayout() {
       <Tabs.Screen name="vehicle-profiles" options={{ href: null }} />
       <Tabs.Screen name="reports" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="operational" options={{ href: null }} />
     </Tabs>
   );
 }

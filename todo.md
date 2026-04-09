@@ -86,3 +86,5 @@
 - [x] Lançamentos: calendário e modal com dados isolados por perfil selecionado
 - [x] Dashboard: cards e métricas separadas para Combustão e Elétrico
 - [x] Histórico: filtro por perfil e dados separados por Combustão/Elétrico
+- [x] Lançamentos: integrar seletor de perfil individual (Combustão/Elétrico) com todos os campos do Operacional no modal
+- [x] Excluir aba Operacional da navegação e do projeto

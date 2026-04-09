@@ -23,11 +23,9 @@ function fmt(val: number): string {
 function fmtKm(val: number): string {
   return `R$ ${val.toFixed(3).replace(".", ",")}/km`;
 }
-
 function todayStr(): string {
   return new Date().toISOString().split("T")[0];
 }
-
 function dateStr(year: number, month: number, day: number): string {
   const m = String(month + 1).padStart(2, "0");
   const d = String(day).padStart(2, "0");
@@ -36,29 +34,47 @@ function dateStr(year: number, month: number, day: number): string {
 
 export default function LancamentosScreen() {
   const { state, recordDayWithTransactions, removeDailyRecord } = useApp();
-  const { dailyRecords, activeProfile, fixedCostResult } = state;
+  const { dailyRecords, vehicleProfiles, operationalProfiles, fixedCostResult } = state;
+
+  // Perfis por tipo — carregados independentemente
+  const profileCombustao = vehicleProfiles.find((p) => p.type === "COMBUSTAO") ?? { precoEnergia: 0, autonomia: 0, margemDesejada: 0, type: "COMBUSTAO" as VehicleType, name: "" };
+  const profileEletrico = vehicleProfiles.find((p) => p.type === "ELETRICO") ?? { precoEnergia: 0, autonomia: 0, margemDesejada: 0, type: "ELETRICO" as VehicleType, name: "" };
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Modal de lançamento — todos os campos do Operacional
+  // Modal de lançamento
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [tipoVeiculo, setTipoVeiculo] = useState<VehicleType>(state.operationalInput.tipoVeiculo);
-  const [precoCombustivel, setPrecoCombustivel] = useState(state.operationalInput.precoCombustivel);
-  const [autonomia, setAutonomia] = useState(state.operationalInput.autonomia);
+
+  // Tipo de veículo selecionado no modal — independente do perfil ativo global
+  const [tipoVeiculo, setTipoVeiculo] = useState<VehicleType>("COMBUSTAO");
+
+  // Campos de energia — carregados do perfil do tipo selecionado
+  const [precoCombustivel, setPrecoCombustivel] = useState(0);
+  const [autonomia, setAutonomia] = useState(0);
+
+  // Dados do dia
   const [kmRodado, setKmRodado] = useState(0);
   const [ganho, setGanho] = useState(0);
-  const [margemDesejada, setMargemDesejada] = useState(state.operationalInput.margemDesejadaPorKm);
+  const [margemDesejada, setMargemDesejada] = useState(0);
   const [gastoAbastecimento, setGastoAbastecimento] = useState(0);
 
   // Modal de detalhe do dia
   const [detailDate, setDetailDate] = useState<string | null>(null);
+  const [detailVehicleType, setDetailVehicleType] = useState<VehicleType | null>(null);
 
-  const recordMap = useMemo(() => {
-    const map = new Map<string, DailyRecord>();
-    for (const r of dailyRecords) map.set(r.date, r);
+  // Perfil ativo para o tipo selecionado no modal
+  const activeProfileForType = tipoVeiculo === "COMBUSTAO" ? profileCombustao : profileEletrico;
+
+  // Mapa de registros por data — pode ter 2 por data (um de cada perfil)
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, DailyRecord[]>();
+    for (const r of dailyRecords) {
+      const existing = map.get(r.date) ?? [];
+      map.set(r.date, [...existing, r]);
+    }
     return map;
   }, [dailyRecords]);
 
@@ -82,31 +98,38 @@ export default function LancamentosScreen() {
     else setViewMonth(m => m + 1);
   };
 
+  // Carrega os dados do perfil do tipo selecionado nos campos do modal
+  const loadProfileDefaults = (type: VehicleType) => {
+    const profile = type === "COMBUSTAO" ? profileCombustao : profileEletrico;
+    const opProfile = operationalProfiles[type];
+    setPrecoCombustivel(opProfile.precoCombustivel > 0 ? opProfile.precoCombustivel : profile.precoEnergia);
+    setAutonomia(opProfile.autonomia > 0 ? opProfile.autonomia : profile.autonomia);
+    setMargemDesejada(opProfile.margemDesejadaPorKm > 0 ? opProfile.margemDesejadaPorKm : profile.margemDesejada);
+  };
+
   const openModal = (day?: number) => {
     const ds = day ? dateStr(viewYear, viewMonth, day) : todayStr();
     setSelectedDate(ds);
-    const existing = recordMap.get(ds);
-    if (existing) {
-      // Editar registro existente
-      setKmRodado(existing.kmRodado);
-      setGanho(existing.ganho);
-      setGastoAbastecimento(existing.custo);
-      setTipoVeiculo(state.operationalInput.tipoVeiculo);
-      setPrecoCombustivel(state.operationalInput.precoCombustivel);
-      setAutonomia(state.operationalInput.autonomia);
-      setMargemDesejada(state.operationalInput.margemDesejadaPorKm);
-    } else {
-      // Novo lançamento — pré-preenche com dados do Operacional
-      const op = state.operationalInput;
-      setTipoVeiculo(op.tipoVeiculo);
-      setPrecoCombustivel(op.precoCombustivel > 0 ? op.precoCombustivel : activeProfile.precoEnergia);
-      setAutonomia(op.autonomia > 0 ? op.autonomia : activeProfile.autonomia);
-      setKmRodado(op.kmRodadoDia > 0 ? op.kmRodadoDia : 0);
-      setGanho(op.ganhoDia > 0 ? op.ganhoDia : 0);
-      setMargemDesejada(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
-      setGastoAbastecimento(op.gastoAbastecimento > 0 ? op.gastoAbastecimento : 0);
-    }
+    // Reseta campos do dia
+    setKmRodado(0);
+    setGanho(0);
+    setGastoAbastecimento(0);
+    // Carrega tipo padrão (Combustão) e seus dados de perfil
+    const defaultType: VehicleType = "COMBUSTAO";
+    setTipoVeiculo(defaultType);
+    loadProfileDefaults(defaultType);
     setModalVisible(true);
+  };
+
+  const handleSwitchVehicle = (i: number) => {
+    const newType: VehicleType = i === 0 ? "COMBUSTAO" : "ELETRICO";
+    setTipoVeiculo(newType);
+    // Ao trocar o tipo, carrega os dados do perfil daquele tipo
+    loadProfileDefaults(newType);
+    // Reseta campos do dia (cada perfil tem seu próprio dia)
+    setKmRodado(0);
+    setGanho(0);
+    setGastoAbastecimento(0);
   };
 
   // Cálculo em tempo real no modal — idêntico ao Operacional
@@ -133,7 +156,7 @@ export default function LancamentosScreen() {
     const now = Date.now();
     const custoReal = gastoAbastecimento > 0 ? gastoAbastecimento : modalResult.custoTotalDiaEstimado;
     recordDayWithTransactions({
-      id: `${selectedDate}-${now}`,
+      id: `${selectedDate}-${tipoVeiculo}-${now}`,
       date: selectedDate,
       kmRodado,
       ganho,
@@ -152,10 +175,15 @@ export default function LancamentosScreen() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     removeDailyRecord(date, vType);
     setDetailDate(null);
+    setDetailVehicleType(null);
   };
 
-  const detailRecord = detailDate ? recordMap.get(detailDate) : null;
   const todayDateStr = todayStr();
+
+  // Registro do detalhe selecionado
+  const detailRecord = detailDate && detailVehicleType
+    ? (recordsByDate.get(detailDate) ?? []).find((r) => r.vehicleType === detailVehicleType) ?? null
+    : null;
 
   return (
     <ScreenContainer>
@@ -188,30 +216,50 @@ export default function LancamentosScreen() {
                 return <View key={`empty-${idx}`} style={styles.cell} />;
               }
               const ds = dateStr(viewYear, viewMonth, day);
-              const hasRecord = recordMap.has(ds);
+              const recs = recordsByDate.get(ds) ?? [];
+              const hasCombustao = recs.some((r) => r.vehicleType === "COMBUSTAO");
+              const hasEletrico = recs.some((r) => r.vehicleType === "ELETRICO");
+              const hasBoth = hasCombustao && hasEletrico;
+              const hasAny = recs.length > 0;
               const isToday = ds === todayDateStr;
+
               return (
                 <TouchableOpacity
                   key={ds}
                   style={[
                     styles.cell,
-                    hasRecord && styles.cellWithRecord,
-                    isToday && !hasRecord && styles.cellToday,
+                    hasBoth && styles.cellBoth,
+                    !hasBoth && hasCombustao && styles.cellCombustao,
+                    !hasBoth && hasEletrico && styles.cellEletrico,
+                    isToday && !hasAny && styles.cellToday,
                   ]}
-                  onPress={() => hasRecord ? setDetailDate(ds) : openModal(day)}
+                  onPress={() => {
+                    if (hasBoth) {
+                      // Tem ambos: abre modal de seleção de qual ver
+                      setDetailDate(ds);
+                      setDetailVehicleType("COMBUSTAO"); // padrão, usuário pode trocar
+                    } else if (hasAny) {
+                      setDetailDate(ds);
+                      setDetailVehicleType(recs[0].vehicleType);
+                    } else {
+                      openModal(day);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <Text style={[
                     styles.cellText,
-                    hasRecord && styles.cellTextRecord,
-                    isToday && !hasRecord && styles.cellTextToday,
+                    hasAny && styles.cellTextRecord,
+                    isToday && !hasAny && styles.cellTextToday,
                   ]}>
                     {day}
                   </Text>
-                  {hasRecord && (
-                    <Text style={styles.cellDot}>
-                      {fmt(recordMap.get(ds)!.ganho - recordMap.get(ds)!.custo).replace("R$ ", "")}
-                    </Text>
+                  {/* Indicadores de perfil */}
+                  {hasAny && (
+                    <View style={styles.cellIndicators}>
+                      {hasCombustao && <View style={[styles.cellDot, { backgroundColor: "#FF9500" }]} />}
+                      {hasEletrico && <View style={[styles.cellDot, { backgroundColor: "#30D158" }]} />}
+                    </View>
                   )}
                 </TouchableOpacity>
               );
@@ -222,8 +270,12 @@ export default function LancamentosScreen() {
         {/* Legenda */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: "#00D4AA" }]} />
-            <Text style={styles.legendText}>Dia com lançamento</Text>
+            <View style={[styles.legendDot, { backgroundColor: "#FF9500" }]} />
+            <Text style={styles.legendText}>⛽ Combustão</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: "#30D158" }]} />
+            <Text style={styles.legendText}>🔋 Elétrico</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: "#0A84FF" }]} />
@@ -231,47 +283,72 @@ export default function LancamentosScreen() {
           </View>
         </View>
 
-        {/* Resumo do mês */}
-        {dailyRecords.filter(r => r.date.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`)).length > 0 && (
-          <View style={styles.monthSummary}>
-            {(() => {
-              const monthRecs = dailyRecords.filter(r =>
-                r.date.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`)
-              );
-              const totalGanho = monthRecs.reduce((s, r) => s + r.ganho, 0);
-              const totalCusto = monthRecs.reduce((s, r) => s + r.custo, 0);
-              const totalFixos = fixedCostResult.custoFixoDiario * monthRecs.length;
-              const lucroLiquido = totalGanho - totalCusto - totalFixos;
-              return (
-                <>
-                  <Text style={styles.summaryTitle}>Resumo de {MONTHS[viewMonth]}</Text>
+        {/* Resumo do mês separado por perfil */}
+        {(() => {
+          const monthPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+          const monthRecs = dailyRecords.filter(r => r.date.startsWith(monthPrefix));
+          const combustaoRecs = monthRecs.filter(r => r.vehicleType === "COMBUSTAO");
+          const eletricoRecs = monthRecs.filter(r => r.vehicleType === "ELETRICO");
+          if (monthRecs.length === 0) return null;
+
+          const calcTotals = (recs: DailyRecord[]) => ({
+            ganho: recs.reduce((s, r) => s + r.ganho, 0),
+            custo: recs.reduce((s, r) => s + r.custo, 0),
+            fixos: fixedCostResult.custoFixoDiario * recs.length,
+            dias: recs.length,
+          });
+
+          const c = calcTotals(combustaoRecs);
+          const e = calcTotals(eletricoRecs);
+          const cLiq = c.ganho - c.custo - c.fixos;
+          const eLiq = e.ganho - e.custo - e.fixos;
+
+          return (
+            <View style={styles.monthSummary}>
+              <Text style={styles.summaryTitle}>Resumo de {MONTHS[viewMonth]}</Text>
+
+              {combustaoRecs.length > 0 && (
+                <View style={[styles.profileSummaryCard, { borderColor: "#FF950044" }]}>
+                  <Text style={[styles.profileSummaryTitle, { color: "#FF9500" }]}>⛽ Combustão · {c.dias} dias</Text>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Dias Trabalhados</Text>
-                      <Text style={styles.summaryValue}>{monthRecs.length}</Text>
+                      <Text style={styles.summaryLabel}>Ganho</Text>
+                      <Text style={[styles.summaryValue, { color: "#30D158" }]}>{fmt(c.ganho)}</Text>
                     </View>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Total Ganho</Text>
-                      <Text style={[styles.summaryValue, { color: "#30D158" }]}>{fmt(totalGanho)}</Text>
+                      <Text style={styles.summaryLabel}>Combustível</Text>
+                      <Text style={[styles.summaryValue, { color: "#FF453A" }]}>{fmt(c.custo)}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryLabel}>Lucro Líq.</Text>
+                      <Text style={[styles.summaryValue, { color: cLiq >= 0 ? "#30D158" : "#FF453A" }]}>{fmt(cLiq)}</Text>
                     </View>
                   </View>
+                </View>
+              )}
+
+              {eletricoRecs.length > 0 && (
+                <View style={[styles.profileSummaryCard, { borderColor: "#30D15844" }]}>
+                  <Text style={[styles.profileSummaryTitle, { color: "#30D158" }]}>🔋 Elétrico · {e.dias} dias</Text>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>{state.activeVehicleType === "ELETRICO" ? "Recarga Elét." : "Combustível"}</Text>
-                      <Text style={[styles.summaryValue, { color: "#FF453A" }]}>{fmt(totalCusto)}</Text>
+                      <Text style={styles.summaryLabel}>Ganho</Text>
+                      <Text style={[styles.summaryValue, { color: "#30D158" }]}>{fmt(e.ganho)}</Text>
                     </View>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Lucro Líquido</Text>
-                      <Text style={[styles.summaryValue, { color: lucroLiquido >= 0 ? "#30D158" : "#FF453A" }]}>
-                        {fmt(lucroLiquido)}
-                      </Text>
+                      <Text style={styles.summaryLabel}>Recarga</Text>
+                      <Text style={[styles.summaryValue, { color: "#FF453A" }]}>{fmt(e.custo)}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryLabel}>Lucro Líq.</Text>
+                      <Text style={[styles.summaryValue, { color: eLiq >= 0 ? "#30D158" : "#FF453A" }]}>{fmt(eLiq)}</Text>
                     </View>
                   </View>
-                </>
-              );
-            })()}
-          </View>
-        )}
+                </View>
+              )}
+            </View>
+          );
+        })()}
       </ScrollView>
 
       {/* Botão + flutuante */}
@@ -279,7 +356,7 @@ export default function LancamentosScreen() {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* ===== MODAL DE LANÇAMENTO — PARIDADE TOTAL COM ABA OPERACIONAL ===== */}
+      {/* ===== MODAL DE LANÇAMENTO ===== */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <ScrollView
@@ -310,20 +387,23 @@ export default function LancamentosScreen() {
                 />
               </View>
 
-              {/* Tipo de veículo */}
+              {/* Tipo de veículo — seletor independente */}
               <Text style={styles.sectionLabel}>Tipo de Veículo</Text>
               <SegmentedControl
-                options={["Combustão", "Elétrico"]}
+                options={["⛽ Combustão", "🔋 Elétrico"]}
                 selectedIndex={tipoVeiculo === "COMBUSTAO" ? 0 : 1}
-                onSelect={(i) => setTipoVeiculo(i === 0 ? "COMBUSTAO" : "ELETRICO")}
+                onSelect={handleSwitchVehicle}
               />
               <View style={styles.sectionSpacer} />
 
-              {/* Badge do perfil ativo */}
-              {(activeProfile.precoEnergia > 0 || activeProfile.autonomia > 0) && (
-                <View style={styles.profileBadge}>
-                  <Text style={styles.profileBadgeText}>
-                    {tipoVeiculo === "COMBUSTAO" ? "⛽" : "🔋"} Perfil ativo: R$ {activeProfile.precoEnergia.toFixed(2).replace(".", ",")} · {activeProfile.autonomia} {tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
+              {/* Badge do perfil individual do tipo selecionado */}
+              {(activeProfileForType.precoEnergia > 0 || activeProfileForType.autonomia > 0) && (
+                <View style={[styles.profileBadge, {
+                  backgroundColor: tipoVeiculo === "COMBUSTAO" ? "rgba(255,149,0,0.1)" : "rgba(48,209,88,0.1)",
+                  borderColor: tipoVeiculo === "COMBUSTAO" ? "rgba(255,149,0,0.3)" : "rgba(48,209,88,0.3)",
+                }]}>
+                  <Text style={[styles.profileBadgeText, { color: tipoVeiculo === "COMBUSTAO" ? "#FF9500" : "#30D158" }]}>
+                    {tipoVeiculo === "COMBUSTAO" ? "⛽" : "🔋"} Perfil {tipoVeiculo === "COMBUSTAO" ? "Combustão" : "Elétrico"}: R$ {activeProfileForType.precoEnergia.toFixed(2).replace(".", ",")} · {activeProfileForType.autonomia} {tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
                   </Text>
                 </View>
               )}
@@ -334,14 +414,14 @@ export default function LancamentosScreen() {
                 label={tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (L)" : "Preço kWh"}
                 value={precoCombustivel}
                 onChangeValue={setPrecoCombustivel}
-                placeholder={activeProfile.precoEnergia > 0 ? activeProfile.precoEnergia.toFixed(2) : "0,00"}
+                placeholder={activeProfileForType.precoEnergia > 0 ? activeProfileForType.precoEnergia.toFixed(2) : "0,00"}
                 suffix="R$"
               />
               <InputField
                 label={tipoVeiculo === "COMBUSTAO" ? "Autonomia (km/L)" : "Autonomia (km/kWh)"}
                 value={autonomia}
                 onChangeValue={setAutonomia}
-                placeholder={activeProfile.autonomia > 0 ? String(activeProfile.autonomia) : "0"}
+                placeholder={activeProfileForType.autonomia > 0 ? String(activeProfileForType.autonomia) : "0"}
                 suffix={tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
               />
 
@@ -365,7 +445,7 @@ export default function LancamentosScreen() {
                 label="Margem Desejada por KM"
                 value={margemDesejada}
                 onChangeValue={setMargemDesejada}
-                placeholder={activeProfile.margemDesejada > 0 ? activeProfile.margemDesejada.toFixed(2) : "0,00"}
+                placeholder={activeProfileForType.margemDesejada > 0 ? activeProfileForType.margemDesejada.toFixed(2) : "0,00"}
                 suffix="R$/km"
               />
 
@@ -401,10 +481,9 @@ export default function LancamentosScreen() {
                 )}
               </View>
 
-              {/* ===== RESULTADOS — idênticos ao Operacional ===== */}
+              {/* ===== RESULTADOS ===== */}
               <Text style={styles.resultsTitle}>Resultados</Text>
 
-              {/* Custo por KM */}
               <ResultCard
                 icon="speed"
                 title={usingRealCost ? "Custo por KM (Real)" : "Custo por KM (Estimado)"}
@@ -417,7 +496,6 @@ export default function LancamentosScreen() {
                 accentColor={usingRealCost ? "#00D4AA" : "#FF9500"}
               />
 
-              {/* Custo do Dia */}
               <ResultCard
                 icon="local-gas-station"
                 title={usingRealCost ? "Custo Real do Dia" : "Custo Estimado do Dia"}
@@ -426,7 +504,6 @@ export default function LancamentosScreen() {
                 accentColor={usingRealCost ? "#FF453A" : "#FF9500"}
               />
 
-              {/* Lucro por KM */}
               <ResultCard
                 icon="trending-up"
                 title="Lucro por KM"
@@ -435,7 +512,6 @@ export default function LancamentosScreen() {
                 accentColor={modalResult.lucroPorKm >= 0 ? "#30D158" : "#FF453A"}
               />
 
-              {/* Lucro Líquido do Dia */}
               <ResultCard
                 icon="account-balance-wallet"
                 title="Lucro Líquido do Dia"
@@ -444,7 +520,6 @@ export default function LancamentosScreen() {
                 accentColor={modalResult.lucroDiaLiquido >= 0 ? "#30D158" : "#FF453A"}
               />
 
-              {/* Valor Mínimo por KM */}
               <ResultCard
                 icon="verified"
                 title="Valor Mínimo por KM"
@@ -467,57 +542,100 @@ export default function LancamentosScreen() {
       </Modal>
 
       {/* Modal de detalhe do dia */}
-      <Modal visible={!!detailDate} transparent animationType="fade" onRequestClose={() => setDetailDate(null)}>
+      <Modal visible={!!detailDate} transparent animationType="fade" onRequestClose={() => { setDetailDate(null); setDetailVehicleType(null); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.detailSheet}>
             <View style={styles.modalHandle} />
-            {detailRecord && (
+            {detailDate && (
               <>
-                <Text style={styles.modalTitle}>📅 {detailRecord.date}</Text>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>KM Rodados</Text>
-                  <Text style={styles.detailValue}>{detailRecord.kmRodado.toFixed(0)} km</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Ganho</Text>
-                  <Text style={[styles.detailValue, { color: "#30D158" }]}>{fmt(detailRecord.ganho)}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{state.activeVehicleType === "ELETRICO" ? "Custo Recarga" : "Custo Combustível"}</Text>
-                  <Text style={[styles.detailValue, { color: "#FF453A" }]}>{fmt(detailRecord.custo)}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Custo Fixo do Dia</Text>
-                  <Text style={[styles.detailValue, { color: "#FF9500" }]}>{fmt(fixedCostResult.custoFixoDiario)}</Text>
-                </View>
-                <View style={[styles.detailRow, styles.detailRowTotal]}>
-                  <Text style={styles.detailLabelBold}>Lucro Líquido</Text>
-                  <Text style={[styles.detailValueBold, {
-                    color: (detailRecord.ganho - detailRecord.custo - fixedCostResult.custoFixoDiario) >= 0 ? "#30D158" : "#FF453A"
-                  }]}>
-                    {fmt(detailRecord.ganho - detailRecord.custo - fixedCostResult.custoFixoDiario)}
-                  </Text>
-                </View>
-                <View style={styles.modalBtns}>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(detailRecord.date, detailRecord.vehicleType)} activeOpacity={0.8}>
-                    <Text style={styles.deleteBtnText}>Excluir</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => {
-                    setDetailDate(null);
-                    setTimeout(() => {
-                      setSelectedDate(detailRecord.date);
-                      setKmRodado(detailRecord.kmRodado);
-                      setGanho(detailRecord.ganho);
-                      setGastoAbastecimento(detailRecord.custo);
-                      setModalVisible(true);
-                    }, 50);
-                  }} activeOpacity={0.8}>
-                    <Text style={styles.editBtnText}>Editar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.saveBtn} onPress={() => setDetailDate(null)} activeOpacity={0.8}>
-                    <Text style={styles.saveBtnText}>Fechar</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.modalTitle}>📅 {detailDate}</Text>
+
+                {/* Se tem ambos os perfis, mostra seletor */}
+                {(() => {
+                  const recs = recordsByDate.get(detailDate) ?? [];
+                  const hasBoth = recs.some(r => r.vehicleType === "COMBUSTAO") && recs.some(r => r.vehicleType === "ELETRICO");
+                  if (hasBoth) {
+                    return (
+                      <View style={styles.detailProfileSelector}>
+                        <TouchableOpacity
+                          style={[styles.detailProfileBtn, detailVehicleType === "COMBUSTAO" && { borderColor: "#FF9500", backgroundColor: "#FF950022" }]}
+                          onPress={() => setDetailVehicleType("COMBUSTAO")}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.detailProfileBtnText, detailVehicleType === "COMBUSTAO" && { color: "#FF9500" }]}>⛽ Combustão</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.detailProfileBtn, detailVehicleType === "ELETRICO" && { borderColor: "#30D158", backgroundColor: "#30D15822" }]}
+                          onPress={() => setDetailVehicleType("ELETRICO")}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.detailProfileBtnText, detailVehicleType === "ELETRICO" && { color: "#30D158" }]}>🔋 Elétrico</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {detailRecord && (
+                  <>
+                    <View style={[styles.detailTypeBadge, {
+                      backgroundColor: detailRecord.vehicleType === "ELETRICO" ? "#30D15822" : "#FF950022",
+                    }]}>
+                      <Text style={[styles.detailTypeBadgeText, { color: detailRecord.vehicleType === "ELETRICO" ? "#30D158" : "#FF9500" }]}>
+                        {detailRecord.vehicleType === "ELETRICO" ? "🔋 Elétrico" : "⛽ Combustão"}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>KM Rodados</Text>
+                      <Text style={styles.detailValue}>{detailRecord.kmRodado.toFixed(0)} km</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Ganho</Text>
+                      <Text style={[styles.detailValue, { color: "#30D158" }]}>{fmt(detailRecord.ganho)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{detailRecord.vehicleType === "ELETRICO" ? "Custo Recarga" : "Custo Combustível"}</Text>
+                      <Text style={[styles.detailValue, { color: "#FF453A" }]}>{fmt(detailRecord.custo)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Custo Fixo do Dia</Text>
+                      <Text style={[styles.detailValue, { color: "#FF9500" }]}>{fmt(fixedCostResult.custoFixoDiario)}</Text>
+                    </View>
+                    <View style={[styles.detailRow, styles.detailRowTotal]}>
+                      <Text style={styles.detailLabelBold}>Lucro Líquido</Text>
+                      <Text style={[
+                        styles.detailValueBold,
+                        { color: (detailRecord.ganho - detailRecord.custo - fixedCostResult.custoFixoDiario) >= 0 ? "#30D158" : "#FF453A" }
+                      ]}>
+                        {fmt(detailRecord.ganho - detailRecord.custo - fixedCostResult.custoFixoDiario)}
+                      </Text>
+                    </View>
+                    <View style={styles.modalBtns}>
+                      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(detailRecord.date, detailRecord.vehicleType)} activeOpacity={0.8}>
+                        <Text style={styles.deleteBtnText}>Excluir</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.editBtn} onPress={() => {
+                        setDetailDate(null);
+                        setDetailVehicleType(null);
+                        setTimeout(() => {
+                          setSelectedDate(detailRecord.date);
+                          setTipoVeiculo(detailRecord.vehicleType);
+                          loadProfileDefaults(detailRecord.vehicleType);
+                          setKmRodado(detailRecord.kmRodado);
+                          setGanho(detailRecord.ganho);
+                          setGastoAbastecimento(detailRecord.custo);
+                          setModalVisible(true);
+                        }, 50);
+                      }} activeOpacity={0.8}>
+                        <Text style={styles.editBtnText}>Editar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.saveBtn} onPress={() => { setDetailDate(null); setDetailVehicleType(null); }} activeOpacity={0.8}>
+                        <Text style={styles.saveBtnText}>Fechar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </>
             )}
           </View>
@@ -555,28 +673,36 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderRadius: 8, padding: 2,
   },
-  cellWithRecord: { backgroundColor: "#00D4AA", borderRadius: 10 },
+  cellCombustao: { backgroundColor: "#FF950033", borderRadius: 10, borderWidth: 1, borderColor: "#FF9500" },
+  cellEletrico: { backgroundColor: "#30D15833", borderRadius: 10, borderWidth: 1, borderColor: "#30D158" },
+  cellBoth: { backgroundColor: "#1C1C1E", borderRadius: 10, borderWidth: 1, borderColor: "#00D4AA" },
   cellToday: { backgroundColor: "#0A84FF22", borderRadius: 10, borderWidth: 1, borderColor: "#0A84FF" },
-  cellText: { color: "#FFFFFF", fontSize: 15, fontWeight: "500" },
-  cellTextRecord: { color: "#000000", fontWeight: "700", fontSize: 14 },
+  cellText: { color: "#FFFFFF", fontSize: 14, fontWeight: "500" },
+  cellTextRecord: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
   cellTextToday: { color: "#0A84FF", fontWeight: "700" },
-  cellDot: { color: "#000000", fontSize: 9, fontWeight: "600", marginTop: 1 },
-  legend: { flexDirection: "row", gap: 16, marginBottom: 20 },
+  cellIndicators: { flexDirection: "row", gap: 2, marginTop: 2 },
+  cellDot: { width: 5, height: 5, borderRadius: 3 },
+  legend: { flexDirection: "row", gap: 12, marginBottom: 20, flexWrap: "wrap" },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { color: "#8E8E93", fontSize: 12 },
   monthSummary: {
     backgroundColor: "#111111", borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: "#1C1C1E", marginBottom: 20,
+    borderWidth: 1, borderColor: "#1C1C1E", marginBottom: 20, gap: 10,
   },
-  summaryTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "700", marginBottom: 12 },
-  summaryRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  summaryTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "700", marginBottom: 4 },
+  profileSummaryCard: {
+    backgroundColor: "#000000", borderRadius: 12, padding: 12,
+    borderWidth: 1,
+  },
+  profileSummaryTitle: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
+  summaryRow: { flexDirection: "row", gap: 8 },
   summaryCard: {
-    flex: 1, backgroundColor: "#000000", borderRadius: 12,
-    padding: 10, borderWidth: 1, borderColor: "#1C1C1E",
+    flex: 1, backgroundColor: "#111111", borderRadius: 10,
+    padding: 8, borderWidth: 1, borderColor: "#1C1C1E",
   },
-  summaryLabel: { color: "#8E8E93", fontSize: 11, fontWeight: "500", marginBottom: 4 },
-  summaryValue: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  summaryLabel: { color: "#8E8E93", fontSize: 10, fontWeight: "500", marginBottom: 3 },
+  summaryValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   fab: {
     position: "absolute", bottom: 24, right: 24,
     width: 56, height: 56, borderRadius: 28,
@@ -611,11 +737,9 @@ const styles = StyleSheet.create({
   },
   sectionSpacer: { height: 12 },
   profileBadge: {
-    backgroundColor: "rgba(10, 132, 255, 0.1)", borderRadius: 10,
-    padding: 10, marginBottom: 16, borderWidth: 1,
-    borderColor: "rgba(10, 132, 255, 0.3)",
+    borderRadius: 10, padding: 10, marginBottom: 16, borderWidth: 1,
   },
-  profileBadgeText: { color: "#0A84FF", fontSize: 13, fontWeight: "500" },
+  profileBadgeText: { fontSize: 13, fontWeight: "600" },
   dateInputRow: {
     backgroundColor: "#000000", borderRadius: 12, borderWidth: 1,
     borderColor: "#2C2C2E", paddingHorizontal: 16, height: 50,
@@ -666,4 +790,13 @@ const styles = StyleSheet.create({
   detailValue: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
   detailLabelBold: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   detailValueBold: { fontSize: 20, fontWeight: "700" },
+  detailTypeBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start", marginBottom: 12 },
+  detailTypeBadgeText: { fontSize: 13, fontWeight: "700" },
+  detailProfileSelector: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  detailProfileBtn: {
+    flex: 1, paddingVertical: 8, borderRadius: 10,
+    borderWidth: 1, borderColor: "#2C2C2E", alignItems: "center",
+    backgroundColor: "#000000",
+  },
+  detailProfileBtnText: { color: "#8E8E93", fontSize: 13, fontWeight: "600" },
 });
