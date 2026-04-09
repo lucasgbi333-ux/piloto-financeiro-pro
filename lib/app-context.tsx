@@ -1,15 +1,33 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, type ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import type {
   FixedCostInput,
   FixedCostResult,
   OperationalInput,
   OperationalResult,
+  VehicleProfile,
+  VehicleType,
   DailyRecord,
+  Transaction,
   ReportItem,
   PeriodFilter,
   DashboardState,
 } from "./types";
-import { calculateFixedCosts, calculateOperationalCost, groupReports } from "./use-cases";
+import {
+  calculateFixedCosts,
+  calculateOperationalCost,
+  getDefaultVehicleProfile,
+  createGanhoTransaction,
+  createCustoTransaction,
+  createAjusteTransaction,
+  groupReports,
+} from "./use-cases";
 import {
   saveFixedCosts,
   loadFixedCosts,
@@ -17,6 +35,13 @@ import {
   loadOperational,
   saveDailyRecord,
   loadDailyRecords,
+  deleteDailyRecord,
+  saveTransaction,
+  loadTransactions,
+  saveVehicleProfile,
+  loadVehicleProfiles,
+  saveActiveVehicleType,
+  loadActiveVehicleType,
 } from "./storage";
 
 // ===== STATE =====
@@ -25,7 +50,14 @@ interface AppState {
   fixedCostResult: FixedCostResult;
   operationalInput: OperationalInput;
   operationalResult: OperationalResult;
+  /** Perfis de veículo (um por tipo: COMBUSTAO e ELETRICO) */
+  vehicleProfiles: VehicleProfile[];
+  /** Tipo de veículo ativo */
+  activeVehicleType: VehicleType;
+  /** Perfil ativo (derivado de vehicleProfiles + activeVehicleType) */
+  activeProfile: VehicleProfile;
   dailyRecords: DailyRecord[];
+  transactions: Transaction[];
   periodFilter: PeriodFilter;
   reports: ReportItem[];
   dashboard: DashboardState;
@@ -53,10 +85,13 @@ const defaultOperationalInput: OperationalInput = {
   gastoAbastecimento: 0,
 };
 
+function getActiveProfile(profiles: VehicleProfile[], type: VehicleType): VehicleProfile {
+  return profiles.find((p) => p.type === type) ?? getDefaultVehicleProfile(type);
+}
+
 function computeDashboard(
   fixedResult: FixedCostResult,
-  opResult: OperationalResult,
-  opInput: OperationalInput
+  opResult: OperationalResult
 ): DashboardState {
   return {
     minPerKm: opResult.valorMinimoKm,
@@ -67,26 +102,48 @@ function computeDashboard(
 
 function buildInitialState(): AppState {
   const fixedResult = calculateFixedCosts(defaultFixedInput);
-  const opResult = calculateOperationalCost(defaultOperationalInput);
+  const defaultProfiles = [
+    getDefaultVehicleProfile("COMBUSTAO"),
+    getDefaultVehicleProfile("ELETRICO"),
+  ];
+  const activeType: VehicleType = "COMBUSTAO";
+  const activeProfile = getActiveProfile(defaultProfiles, activeType);
+  const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
     operationalInput: defaultOperationalInput,
     operationalResult: opResult,
+    vehicleProfiles: defaultProfiles,
+    activeVehicleType: activeType,
+    activeProfile,
     dailyRecords: [],
+    transactions: [],
     periodFilter: "DAY",
     reports: [],
-    dashboard: computeDashboard(fixedResult, opResult, defaultOperationalInput),
+    dashboard: computeDashboard(fixedResult, opResult),
     loaded: false,
   };
 }
 
 // ===== ACTIONS =====
 type Action =
-  | { type: "LOAD_ALL"; fixedInput: FixedCostInput; opInput: OperationalInput; records: DailyRecord[] }
+  | {
+      type: "LOAD_ALL";
+      fixedInput: FixedCostInput;
+      opInput: OperationalInput;
+      records: DailyRecord[];
+      transactions: Transaction[];
+      vehicleProfiles: VehicleProfile[];
+      activeVehicleType: VehicleType;
+    }
   | { type: "SET_FIXED_COSTS"; input: FixedCostInput }
   | { type: "SET_OPERATIONAL"; input: OperationalInput }
+  | { type: "SET_ACTIVE_VEHICLE_TYPE"; vehicleType: VehicleType }
+  | { type: "SAVE_VEHICLE_PROFILE"; profile: VehicleProfile }
   | { type: "ADD_DAILY_RECORD"; record: DailyRecord }
+  | { type: "DELETE_DAILY_RECORD"; date: string }
+  | { type: "ADD_TRANSACTION"; transaction: Transaction }
   | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -95,7 +152,12 @@ function reducer(state: AppState, action: Action): AppState {
       const fi = action.fixedInput;
       const oi = action.opInput;
       const fr = calculateFixedCosts(fi);
-      const or2 = calculateOperationalCost(oi);
+      const profiles = action.vehicleProfiles.length > 0
+        ? action.vehicleProfiles
+        : [getDefaultVehicleProfile("COMBUSTAO"), getDefaultVehicleProfile("ELETRICO")];
+      const activeType = action.activeVehicleType;
+      const activeProfile = getActiveProfile(profiles, activeType);
+      const or2 = calculateOperationalCost(oi, activeProfile);
       const recs = action.records;
       return {
         ...state,
@@ -103,9 +165,13 @@ function reducer(state: AppState, action: Action): AppState {
         fixedCostResult: fr,
         operationalInput: oi,
         operationalResult: or2,
+        vehicleProfiles: profiles,
+        activeVehicleType: activeType,
+        activeProfile,
         dailyRecords: recs,
+        transactions: action.transactions,
         reports: groupReports(recs, state.periodFilter),
-        dashboard: computeDashboard(fr, or2, oi),
+        dashboard: computeDashboard(fr, or2),
         loaded: true,
       };
     }
@@ -115,23 +181,56 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         fixedCostInput: action.input,
         fixedCostResult: fr,
-        dashboard: computeDashboard(fr, state.operationalResult, state.operationalInput),
+        dashboard: computeDashboard(fr, state.operationalResult),
       };
     }
     case "SET_OPERATIONAL": {
-      const or2 = calculateOperationalCost(action.input);
+      const or2 = calculateOperationalCost(action.input, state.activeProfile);
       return {
         ...state,
         operationalInput: action.input,
         operationalResult: or2,
-        dashboard: computeDashboard(state.fixedCostResult, or2, action.input),
+        dashboard: computeDashboard(state.fixedCostResult, or2),
+      };
+    }
+    case "SET_ACTIVE_VEHICLE_TYPE": {
+      const activeProfile = getActiveProfile(state.vehicleProfiles, action.vehicleType);
+      const or2 = calculateOperationalCost(
+        { ...state.operationalInput, tipoVeiculo: action.vehicleType },
+        activeProfile
+      );
+      return {
+        ...state,
+        activeVehicleType: action.vehicleType,
+        activeProfile,
+        operationalInput: { ...state.operationalInput, tipoVeiculo: action.vehicleType },
+        operationalResult: or2,
+        dashboard: computeDashboard(state.fixedCostResult, or2),
+      };
+    }
+    case "SAVE_VEHICLE_PROFILE": {
+      const profiles = [...state.vehicleProfiles];
+      const idx = profiles.findIndex((p) => p.type === action.profile.type);
+      if (idx >= 0) {
+        profiles[idx] = action.profile;
+      } else {
+        profiles.push(action.profile);
+      }
+      const activeProfile = getActiveProfile(profiles, state.activeVehicleType);
+      const or2 = calculateOperationalCost(state.operationalInput, activeProfile);
+      return {
+        ...state,
+        vehicleProfiles: profiles,
+        activeProfile,
+        operationalResult: or2,
+        dashboard: computeDashboard(state.fixedCostResult, or2),
       };
     }
     case "ADD_DAILY_RECORD": {
       const recs = [...state.dailyRecords];
       const idx = recs.findIndex((r) => r.date === action.record.date);
       if (idx >= 0) {
-        recs[idx] = action.record;
+        recs[idx] = { ...action.record, updatedAt: Date.now() };
       } else {
         recs.push(action.record);
       }
@@ -139,6 +238,20 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         dailyRecords: recs,
         reports: groupReports(recs, state.periodFilter),
+      };
+    }
+    case "DELETE_DAILY_RECORD": {
+      const recs = state.dailyRecords.filter((r) => r.date !== action.date);
+      return {
+        ...state,
+        dailyRecords: recs,
+        reports: groupReports(recs, state.periodFilter),
+      };
+    }
+    case "ADD_TRANSACTION": {
+      return {
+        ...state,
+        transactions: [...state.transactions, action.transaction],
       };
     }
     case "SET_PERIOD_FILTER": {
@@ -158,8 +271,19 @@ interface AppContextValue {
   state: AppState;
   setFixedCosts: (input: FixedCostInput) => void;
   setOperational: (input: OperationalInput) => void;
+  /** Alterna o tipo de veículo ativo (COMBUSTAO | ELETRICO) */
+  setActiveVehicleType: (type: VehicleType) => void;
+  /** Salva ou atualiza o perfil de um tipo de veículo */
+  saveVehicleProfileAction: (profile: VehicleProfile) => void;
+  /** Salva ou atualiza um registro diário (upsert por data) */
   addDailyRecord: (record: DailyRecord) => void;
+  /** Remove um registro diário por data */
+  removeDailyRecord: (date: string) => void;
+  /** Adiciona uma transação ao histórico */
+  addTransaction: (tx: Transaction) => void;
   setPeriodFilter: (filter: PeriodFilter) => void;
+  /** Helpers para criar transações automaticamente ao salvar dia */
+  recordDayWithTransactions: (record: DailyRecord) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -167,19 +291,24 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
 
-  // Load from AsyncStorage on mount
   useEffect(() => {
     (async () => {
-      const [fi, oi, recs] = await Promise.all([
+      const [fi, oi, recs, txs, profiles, activeType] = await Promise.all([
         loadFixedCosts(),
         loadOperational(),
         loadDailyRecords(),
+        loadTransactions(),
+        loadVehicleProfiles(),
+        loadActiveVehicleType(),
       ]);
       dispatch({
         type: "LOAD_ALL",
         fixedInput: fi || defaultFixedInput,
         opInput: oi || defaultOperationalInput,
         records: recs,
+        transactions: txs,
+        vehicleProfiles: profiles,
+        activeVehicleType: activeType,
       });
     })();
   }, []);
@@ -187,6 +316,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setFixedCosts = useCallback((input: FixedCostInput) => {
     dispatch({ type: "SET_FIXED_COSTS", input });
     saveFixedCosts(input);
+    // Registra ajuste de custo fixo no histórico de transações
+    const fr = calculateFixedCosts(input);
+    const tx = createAjusteTransaction(fr.custoMensalTotal, "Atualização de custos fixos");
+    dispatch({ type: "ADD_TRANSACTION", transaction: tx });
+    saveTransaction(tx);
   }, []);
 
   const setOperational = useCallback((input: OperationalInput) => {
@@ -194,18 +328,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveOperational(input);
   }, []);
 
+  const setActiveVehicleType = useCallback((type: VehicleType) => {
+    dispatch({ type: "SET_ACTIVE_VEHICLE_TYPE", vehicleType: type });
+    saveActiveVehicleType(type);
+  }, []);
+
+  const saveVehicleProfileAction = useCallback((profile: VehicleProfile) => {
+    dispatch({ type: "SAVE_VEHICLE_PROFILE", profile });
+    saveVehicleProfile(profile);
+  }, []);
+
   const addDailyRecord = useCallback((record: DailyRecord) => {
     dispatch({ type: "ADD_DAILY_RECORD", record });
     saveDailyRecord(record);
+  }, []);
+
+  const removeDailyRecord = useCallback((date: string) => {
+    dispatch({ type: "DELETE_DAILY_RECORD", date });
+    deleteDailyRecord(date);
+  }, []);
+
+  const addTransaction = useCallback((tx: Transaction) => {
+    dispatch({ type: "ADD_TRANSACTION", transaction: tx });
+    saveTransaction(tx);
   }, []);
 
   const setPeriodFilter = useCallback((filter: PeriodFilter) => {
     dispatch({ type: "SET_PERIOD_FILTER", filter });
   }, []);
 
+  /**
+   * Salva o dia E registra automaticamente as transações de GANHO e CUSTO.
+   */
+  const recordDayWithTransactions = useCallback((record: DailyRecord) => {
+    dispatch({ type: "ADD_DAILY_RECORD", record });
+    saveDailyRecord(record);
+    const ganhoTx = createGanhoTransaction(record);
+    const custoTx = createCustoTransaction(record);
+    dispatch({ type: "ADD_TRANSACTION", transaction: ganhoTx });
+    dispatch({ type: "ADD_TRANSACTION", transaction: custoTx });
+    saveTransaction(ganhoTx);
+    saveTransaction(custoTx);
+  }, []);
+
   return (
     <AppContext.Provider
-      value={{ state, setFixedCosts, setOperational, addDailyRecord, setPeriodFilter }}
+      value={{
+        state,
+        setFixedCosts,
+        setOperational,
+        setActiveVehicleType,
+        saveVehicleProfileAction,
+        addDailyRecord,
+        removeDailyRecord,
+        addTransaction,
+        setPeriodFilter,
+        recordDayWithTransactions,
+      }}
     >
       {children}
     </AppContext.Provider>

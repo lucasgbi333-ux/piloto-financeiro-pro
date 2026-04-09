@@ -1,7 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { calculateFixedCosts, calculateOperationalCost, groupReports } from "../use-cases";
-import type { FixedCostInput, OperationalInput, DailyRecord } from "../types";
+import {
+  calculateFixedCosts,
+  calculateOperationalCost,
+  groupReports,
+  createGanhoTransaction,
+  createCustoTransaction,
+  getDefaultVehicleProfile,
+} from "../use-cases";
+import type {
+  FixedCostInput,
+  OperationalInput,
+  DailyRecord,
+  VehicleProfile,
+} from "../types";
 
+// Helper para criar DailyRecord completo
+function makeDailyRecord(partial: { date: string; kmRodado: number; ganho: number; custo: number }): DailyRecord {
+  const now = Date.now();
+  return {
+    id: `${partial.date}-test`,
+    date: partial.date,
+    kmRodado: partial.kmRodado,
+    ganho: partial.ganho,
+    custo: partial.custo,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// ===== CUSTOS FIXOS =====
 describe("calculateFixedCosts", () => {
   it("should calculate monthly, annual and daily costs with seguro anual", () => {
     const input: FixedCostInput = {
@@ -15,10 +42,7 @@ describe("calculateFixedCosts", () => {
       tipoSeguro: "ANUAL",
     };
     const result = calculateFixedCosts(input);
-    // ipvaMensal = 1200/12 = 100
-    // veiculoCusto = 800 (financiamento)
-    // seguroMensal = 2400/12 = 200
-    // total = 100 + 800 + 200 + 100 + 50 = 1250
+    // ipvaMensal=100, financiamento=800, seguroMensal=200, internet=100, outros=50 → 1250
     expect(result.custoMensalTotal).toBeCloseTo(1250, 2);
     expect(result.custoAnualTotal).toBeCloseTo(15000, 2);
     expect(result.custoDiarioNecessario).toBeCloseTo(1250 / 30, 2);
@@ -52,11 +76,11 @@ describe("calculateFixedCosts", () => {
       tipoSeguro: "ANUAL",
     };
     const result = calculateFixedCosts(input);
-    // aluguelMensal = 500 * 4.33 = 2165
     expect(result.custoMensalTotal).toBeCloseTo(2165, 2);
   });
 });
 
+// ===== CUSTO OPERACIONAL =====
 describe("calculateOperationalCost", () => {
   it("should use gasto real (abastecimento) when provided", () => {
     const input: OperationalInput = {
@@ -66,20 +90,14 @@ describe("calculateOperationalCost", () => {
       kmRodadoDia: 200,
       ganhoDia: 300,
       margemDesejadaPorKm: 0.5,
-      gastoAbastecimento: 70, // gasto real informado
+      gastoAbastecimento: 70,
     };
     const result = calculateOperationalCost(input);
-    // custoPorKm = 6/12 = 0.5 (estimado)
     expect(result.custoPorKm).toBeCloseTo(0.5, 3);
-    // custoTotalDiaEstimado = 0.5 * 200 = 100
     expect(result.custoTotalDiaEstimado).toBeCloseTo(100, 2);
-    // custoTotalDiaReal = 70 (gasto real informado)
     expect(result.custoTotalDiaReal).toBeCloseTo(70, 2);
-    // lucroDia = 300 - 70 = 230
     expect(result.lucroDia).toBeCloseTo(230, 2);
-    // lucroPorKm = 230 / 200 = 1.15
     expect(result.lucroPorKm).toBeCloseTo(1.15, 3);
-    // valorMinimoKm = 0.5 + 0.5 = 1.0
     expect(result.valorMinimoKm).toBeCloseTo(1.0, 3);
   });
 
@@ -94,11 +112,8 @@ describe("calculateOperationalCost", () => {
       gastoAbastecimento: 0,
     };
     const result = calculateOperationalCost(input);
-    // custoTotalDiaReal = estimado = 100
     expect(result.custoTotalDiaReal).toBeCloseTo(100, 2);
-    // lucroDia = 300 - 100 = 200
     expect(result.lucroDia).toBeCloseTo(200, 2);
-    // lucroPorKm = 200 / 200 = 1.0
     expect(result.lucroPorKm).toBeCloseTo(1.0, 3);
   });
 
@@ -118,31 +133,68 @@ describe("calculateOperationalCost", () => {
     expect(result.custoTotalDiaReal).toBe(0);
   });
 
-  it("should calculate electric vehicle with real charge cost", () => {
+  it("should use VehicleProfile values when input fields are 0", () => {
     const input: OperationalInput = {
-      tipoVeiculo: "ELETRICO",
-      precoCombustivel: 0.8,
-      autonomia: 6,
-      kmRodadoDia: 150,
-      ganhoDia: 250,
-      margemDesejadaPorKm: 0.3,
-      gastoAbastecimento: 50, // recarga real
+      tipoVeiculo: "COMBUSTAO",
+      precoCombustivel: 0,
+      autonomia: 0,
+      kmRodadoDia: 200,
+      ganhoDia: 300,
+      margemDesejadaPorKm: 0,
+      gastoAbastecimento: 0,
     };
-    const result = calculateOperationalCost(input);
-    // custoTotalDiaReal = 50 (recarga real)
-    expect(result.custoTotalDiaReal).toBeCloseTo(50, 2);
-    // lucroDia = 250 - 50 = 200
-    expect(result.lucroDia).toBeCloseTo(200, 2);
-    // lucroPorKm = 200 / 150 = 1.333
-    expect(result.lucroPorKm).toBeCloseTo(1.333, 3);
+    const profile: VehicleProfile = {
+      id: "combustao",
+      type: "COMBUSTAO",
+      precoEnergia: 6.0,
+      autonomia: 12,
+      margemDesejada: 0.5,
+    };
+    const result = calculateOperationalCost(input, profile);
+    expect(result.custoPorKm).toBeCloseTo(0.5, 3);
+    expect(result.valorMinimoKm).toBeCloseTo(1.0, 3);
   });
 });
 
+// ===== PERFIS DE VEÍCULO =====
+describe("getDefaultVehicleProfile", () => {
+  it("should return default COMBUSTAO profile", () => {
+    const p = getDefaultVehicleProfile("COMBUSTAO");
+    expect(p.type).toBe("COMBUSTAO");
+    expect(p.precoEnergia).toBe(0);
+    expect(p.autonomia).toBe(0);
+  });
+
+  it("should return default ELETRICO profile", () => {
+    const p = getDefaultVehicleProfile("ELETRICO");
+    expect(p.type).toBe("ELETRICO");
+  });
+});
+
+// ===== TRANSAÇÕES =====
+describe("createGanhoTransaction / createCustoTransaction", () => {
+  it("should create GANHO transaction from DailyRecord", () => {
+    const record = makeDailyRecord({ date: "2025-01-15", kmRodado: 200, ganho: 300, custo: 100 });
+    const tx = createGanhoTransaction(record);
+    expect(tx.type).toBe("GANHO");
+    expect(tx.amount).toBe(300);
+    expect(tx.description).toContain("2025-01-15");
+  });
+
+  it("should create CUSTO transaction from DailyRecord", () => {
+    const record = makeDailyRecord({ date: "2025-01-15", kmRodado: 200, ganho: 300, custo: 100 });
+    const tx = createCustoTransaction(record);
+    expect(tx.type).toBe("CUSTO");
+    expect(tx.amount).toBe(100);
+  });
+});
+
+// ===== RELATÓRIOS =====
 describe("groupReports", () => {
   const records: DailyRecord[] = [
-    { date: "2025-01-15", kmRodado: 200, ganho: 300, custo: 100 },
-    { date: "2025-01-16", kmRodado: 180, ganho: 280, custo: 90 },
-    { date: "2025-02-10", kmRodado: 220, ganho: 350, custo: 110 },
+    makeDailyRecord({ date: "2025-01-15", kmRodado: 200, ganho: 300, custo: 100 }),
+    makeDailyRecord({ date: "2025-01-16", kmRodado: 180, ganho: 280, custo: 90 }),
+    makeDailyRecord({ date: "2025-02-10", kmRodado: 220, ganho: 350, custo: 110 }),
   ];
 
   it("should return individual days for DAY filter", () => {
@@ -159,7 +211,6 @@ describe("groupReports", () => {
     expect(result).toHaveLength(2);
     const jan = result.find((r) => r.period.startsWith("Jan"));
     expect(jan).toBeDefined();
-    // Jan: (300-100) + (280-90) = 200 + 190 = 390
     expect(jan!.totalProfit).toBeCloseTo(390, 2);
   });
 

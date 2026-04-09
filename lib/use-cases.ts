@@ -3,17 +3,18 @@ import type {
   FixedCostResult,
   OperationalInput,
   OperationalResult,
+  VehicleProfile,
   DailyRecord,
+  Transaction,
+  TransactionType,
   ReportItem,
   PeriodFilter,
 } from "./types";
 
 // ===== MÓDULO 1: CUSTOS FIXOS =====
 export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
-  // IPVA: divide o valor anual em 12 parcelas mensais
   const ipvaMensal = input.ipvaAnual / 12;
 
-  // Aluguel: converte para mensal conforme periodicidade
   let aluguelMensal = 0;
   if (input.aluguelValor > 0) {
     aluguelMensal =
@@ -22,7 +23,6 @@ export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
         : input.aluguelValor;
   }
 
-  // Seguro: converte para mensal conforme periodicidade
   let seguroMensal = 0;
   if (input.seguroValor > 0) {
     seguroMensal =
@@ -31,11 +31,9 @@ export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
         : input.seguroValor;
   }
 
-  // Veículo: financiamento tem prioridade sobre aluguel
   const veiculoCusto =
     input.financiamentoMensal > 0 ? input.financiamentoMensal : aluguelMensal;
 
-  // Total mensal = IPVA + veículo + seguro + internet + outros
   const custoMensalTotal =
     ipvaMensal +
     veiculoCusto +
@@ -44,50 +42,37 @@ export function calculateFixedCosts(input: FixedCostInput): FixedCostResult {
     input.outrosCustos;
 
   const custoAnualTotal = custoMensalTotal * 12;
-
-  // Necessário por dia para cobrir custos mensais (mês = 30 dias)
   const custoDiarioNecessario = custoMensalTotal / 30;
-
-  // Necessário por dia para cobrir custos anuais (ano = 365 dias)
   const custoDiarioAnual = custoAnualTotal / 365;
 
-  return {
-    custoMensalTotal,
-    custoAnualTotal,
-    custoDiarioNecessario,
-    custoDiarioAnual,
-  };
+  return { custoMensalTotal, custoAnualTotal, custoDiarioNecessario, custoDiarioAnual };
 }
 
 // ===== MÓDULO 2: CUSTO OPERACIONAL =====
-export function calculateOperationalCost(input: OperationalInput): OperationalResult {
-  // Custo estimado por KM (baseado no preço e autonomia)
-  const custoPorKm =
-    input.autonomia > 0 ? input.precoCombustivel / input.autonomia : 0;
+/**
+ * Calcula custo operacional. Aceita um VehicleProfile opcional para preencher
+ * automaticamente preço e autonomia a partir do perfil ativo.
+ */
+export function calculateOperationalCost(
+  input: OperationalInput,
+  profile?: VehicleProfile
+): OperationalResult {
+  // Se perfil ativo fornecido, usa seus valores como base (input pode sobrescrever)
+  const preco = input.precoCombustivel > 0 ? input.precoCombustivel : (profile?.precoEnergia ?? 0);
+  const autonomia = input.autonomia > 0 ? input.autonomia : (profile?.autonomia ?? 0);
+  const margem = input.margemDesejadaPorKm > 0 ? input.margemDesejadaPorKm : (profile?.margemDesejada ?? 0);
 
-  // Custo total estimado do dia (sem gasto real)
+  const custoPorKm = autonomia > 0 ? preco / autonomia : 0;
   const custoTotalDiaEstimado = custoPorKm * input.kmRodadoDia;
 
-  // Custo total REAL do dia:
-  // Se o motorista informou o gasto real (abastecimento/recarga), usa esse valor.
-  // Caso contrário, usa o estimado.
   const custoTotalDiaReal =
     input.gastoAbastecimento > 0
       ? input.gastoAbastecimento
       : custoTotalDiaEstimado;
 
-  // Lucro líquido do dia = ganho - custo real
   const lucroDia = input.ganhoDia - custoTotalDiaReal;
-
-  // Lucro por KM = lucro do dia / km rodados (usando custo real)
-  const lucroPorKm =
-    input.kmRodadoDia > 0
-      ? lucroDia / input.kmRodadoDia
-      : 0;
-
-  // Valor mínimo por KM para aceitar corrida = custo estimado/km + margem desejada
-  // (não inclui custos fixos, conforme especificação original)
-  const valorMinimoKm = custoPorKm + input.margemDesejadaPorKm;
+  const lucroPorKm = input.kmRodadoDia > 0 ? lucroDia / input.kmRodadoDia : 0;
+  const valorMinimoKm = custoPorKm + margem;
 
   return {
     custoPorKm,
@@ -99,7 +84,50 @@ export function calculateOperationalCost(input: OperationalInput): OperationalRe
   };
 }
 
-// ===== MÓDULO 3: RELATÓRIOS =====
+// ===== MÓDULO 3: PERFIS DE VEÍCULO =====
+/** Perfis padrão para cada tipo de veículo */
+export function getDefaultVehicleProfile(type: "COMBUSTAO" | "ELETRICO"): VehicleProfile {
+  if (type === "COMBUSTAO") {
+    return { id: "combustao", type: "COMBUSTAO", precoEnergia: 0, autonomia: 0, margemDesejada: 0 };
+  }
+  return { id: "eletrico", type: "ELETRICO", precoEnergia: 0, autonomia: 0, margemDesejada: 0 };
+}
+
+// ===== MÓDULO 4: TRANSAÇÕES =====
+/** Cria uma transação de ganho a partir de um registro diário */
+export function createGanhoTransaction(record: DailyRecord): Transaction {
+  return {
+    id: `ganho-${record.date}-${Date.now()}`,
+    type: "GANHO" as TransactionType,
+    amount: record.ganho,
+    date: Date.now(),
+    description: `Ganho do dia ${record.date}`,
+  };
+}
+
+/** Cria uma transação de custo a partir de um registro diário */
+export function createCustoTransaction(record: DailyRecord): Transaction {
+  return {
+    id: `custo-${record.date}-${Date.now()}`,
+    type: "CUSTO" as TransactionType,
+    amount: record.custo,
+    date: Date.now(),
+    description: `Custo do dia ${record.date}`,
+  };
+}
+
+/** Cria uma transação de ajuste de custo fixo */
+export function createAjusteTransaction(amount: number, description: string): Transaction {
+  return {
+    id: `ajuste-${Date.now()}`,
+    type: "AJUSTE" as TransactionType,
+    amount,
+    date: Date.now(),
+    description,
+  };
+}
+
+// ===== MÓDULO 5: RELATÓRIOS (baseados em dados reais do histórico) =====
 function getWeekKey(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const startOfYear = new Date(d.getFullYear(), 0, 1);
@@ -110,17 +138,15 @@ function getWeekKey(dateStr: string): string {
 
 function getMonthKey(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
-  const months = [
-    "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-    "Jul", "Ago", "Set", "Out", "Nov", "Dez",
-  ];
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   return `${months[d.getMonth()]}/${d.getFullYear()}`;
 }
 
-export function groupReports(
-  records: DailyRecord[],
-  filter: PeriodFilter
-): ReportItem[] {
+/**
+ * Agrupa registros diários reais por período.
+ * Usa exclusivamente dados do histórico (DailyRecord[]) — não dados temporários de tela.
+ */
+export function groupReports(records: DailyRecord[], filter: PeriodFilter): ReportItem[] {
   if (records.length === 0) return [];
 
   const sorted = [...records].sort(

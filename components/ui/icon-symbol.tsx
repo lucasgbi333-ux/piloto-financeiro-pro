@@ -14,6 +14,8 @@ const MAPPING = {
   "doc.text.fill": "description",
   "car.fill": "directions-car",
   "chart.bar.fill": "bar-chart",
+  "person.fill": "person",
+  "list.bullet": "list",
 } as IconMapping;
 
 export function IconSymbol({

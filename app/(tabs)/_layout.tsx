@@ -14,8 +14,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveTintColor: "#00D4AA",
+        tabBarInactiveTintColor: "#8E8E93",
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
@@ -26,34 +26,52 @@ export default function TabLayout() {
           borderTopColor: "#1C1C1E",
           borderTopWidth: 0.5,
         },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Dashboard",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="fixed-costs"
         options={{
-          title: "Custos Fixos",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
+          title: "Fixos",
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="doc.text.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="operational"
         options={{
           title: "Operacional",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="car.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="car.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="vehicle-profiles"
+        options={{
+          title: "Perfis",
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "Histórico",
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="list.bullet" color={color} />,
         }}
       />
       <Tabs.Screen
         name="reports"
         options={{
           title: "Relatórios",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.bar.fill" color={color} />,
         }}
       />
     </Tabs>

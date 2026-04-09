@@ -30,3 +30,12 @@
 - [x] Adicionar campo de seguro nos Custos Fixos (tipo e valor)
 - [x] Incluir seguro em todos os cálculos de custo fixo
 - [x] Corrigir cálculo operacional: gasto real com combustível/recarga entra no custo total do dia e lucro por KM
+- [x] Atualizar DailyRecord com id, createdAt, updatedAt e lógica upsert por data
+- [x] Criar modelo Transaction (GANHO/CUSTO/AJUSTE) e persistência
+- [x] Criar modelo VehicleProfile (Combustão/Elétrico) com precoEnergia, autonomia, margemDesejada
+- [x] Criar VehicleProfileManager (setActiveProfile / getActiveProfile)
+- [x] Integrar perfil ativo ao OperationalCostUseCase
+- [x] Criar tela de Histórico de Transações com lista e filtros
+- [x] Criar tela de Perfis de Veículo com edição separada por tipo
+- [x] Atualizar Relatórios para usar dados reais do histórico
+- [x] Atualizar navegação com novas tabs/telas

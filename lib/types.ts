@@ -9,24 +9,36 @@ export interface FixedCostInput {
   tipoAluguel: RentalType;
   internetMensal: number;
   outrosCustos: number;
-  /** Valor do seguro do veículo */
   seguroValor: number;
-  /** Periodicidade do seguro: MENSAL ou ANUAL */
   tipoSeguro: InsuranceType;
 }
 
 export interface FixedCostResult {
   custoMensalTotal: number;
   custoAnualTotal: number;
-  /** Necessário por dia para cobrir custos mensais (total_mensal / 30) */
   custoDiarioNecessario: number;
-  /** Necessário por dia para cobrir custos anuais (total_anual / 365) */
   custoDiarioAnual: number;
 }
 
-// ===== CUSTO OPERACIONAL =====
+// ===== PERFIS DE VEÍCULO =====
 export type VehicleType = "COMBUSTAO" | "ELETRICO";
 
+/**
+ * Perfil de veículo separado por tipo.
+ * Combustão e Elétrico têm configurações independentes.
+ */
+export interface VehicleProfile {
+  id: string;
+  type: VehicleType;
+  /** Preço por litro (combustão) ou por kWh (elétrico) */
+  precoEnergia: number;
+  /** km/L (combustão) ou km/kWh (elétrico) */
+  autonomia: number;
+  /** Margem de lucro desejada por KM */
+  margemDesejada: number;
+}
+
+// ===== CUSTO OPERACIONAL =====
 export interface OperationalInput {
   tipoVeiculo: VehicleType;
   /** Preço por litro (combustão) ou por kWh (elétrico) */
@@ -41,29 +53,43 @@ export interface OperationalInput {
 }
 
 export interface OperationalResult {
-  /** Custo estimado por KM (preço / autonomia) */
   custoPorKm: number;
-  /** Custo total estimado do dia (custoPorKm × km) */
   custoTotalDiaEstimado: number;
-  /** Custo total real do dia — usa gastoAbastecimento se informado, senão estimado */
   custoTotalDiaReal: number;
-  /** Lucro por KM calculado com o custo REAL */
   lucroPorKm: number;
-  /** Lucro líquido do dia (ganho - custo real) */
   lucroDia: number;
-  /** Valor mínimo por KM para aceitar corrida (custoPorKm + margem) */
   valorMinimoKm: number;
+}
+
+// ===== REGISTRO DIÁRIO (aprimorado) =====
+export interface DailyRecord {
+  /** UUID único do registro */
+  id: string;
+  /** Data no formato YYYY-MM-DD */
+  date: string;
+  kmRodado: number;
+  ganho: number;
+  custo: number;
+  /** Timestamp de criação (ms) */
+  createdAt: number;
+  /** Timestamp da última atualização (ms) */
+  updatedAt: number;
+}
+
+// ===== HISTÓRICO DE TRANSAÇÕES =====
+export type TransactionType = "GANHO" | "CUSTO" | "AJUSTE";
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  /** Timestamp (ms) */
+  date: number;
+  description: string;
 }
 
 // ===== RELATÓRIOS =====
 export type PeriodFilter = "DAY" | "WEEK" | "MONTH";
-
-export interface DailyRecord {
-  date: string; // ISO date string YYYY-MM-DD
-  kmRodado: number;
-  ganho: number;
-  custo: number;
-}
 
 export interface ReportItem {
   period: string;

@@ -1,4 +1,6 @@
-import { ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import {
+  ScrollView, Text, View, StyleSheet, TouchableOpacity, Platform, TextInput,
+} from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { InputField } from "@/components/ui/input-field";
 import { ResultCard } from "@/components/ui/result-card";
@@ -6,26 +8,41 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useApp } from "@/lib/app-context";
 import type { OperationalInput, VehicleType } from "@/lib/types";
 import * as Haptics from "expo-haptics";
+import { useState } from "react";
 
 function fmt(val: number): string {
   return `R$ ${val.toFixed(2).replace(".", ",")}`;
 }
-
 function fmtKm(val: number): string {
   return `R$ ${val.toFixed(3).replace(".", ",")}/km`;
 }
 
 export default function OperationalScreen() {
-  const { state, setOperational, addDailyRecord } = useApp();
-  const input = state.operationalInput;
-  const result = state.operationalResult;
+  const { state, setOperational, setActiveVehicleType, recordDayWithTransactions } = useApp();
+  const { operationalInput: input, operationalResult: result, activeProfile } = state;
 
-  const update = (partial: Partial<OperationalInput>) => {
-    setOperational({ ...input, ...partial });
-  };
+  // Data editável para o registro
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
   const vehicleOptions: VehicleType[] = ["COMBUSTAO", "ELETRICO"];
   const vehicleIndex = vehicleOptions.indexOf(input.tipoVeiculo);
+
+  const updateInput = (partial: Partial<OperationalInput>) => {
+    setOperational({ ...input, ...partial });
+  };
+
+  const handleSwitchVehicle = (i: number) => {
+    const newType = vehicleOptions[i];
+    // Atualiza perfil ativo e preenche campos do perfil salvo
+    setActiveVehicleType(newType);
+    setOperational({
+      ...input,
+      tipoVeiculo: newType,
+      precoCombustivel: activeProfile.precoEnergia,
+      autonomia: activeProfile.autonomia,
+      margemDesejadaPorKm: activeProfile.margemDesejada,
+    });
+  };
 
   const usingRealCost = input.gastoAbastecimento > 0;
 
@@ -33,25 +50,24 @@ export default function OperationalScreen() {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    const today = new Date().toISOString().split("T")[0];
-    addDailyRecord({
-      date: today,
+    const now = Date.now();
+    recordDayWithTransactions({
+      id: `${selectedDate}-${now}`,
+      date: selectedDate,
       kmRodado: input.kmRodadoDia,
       ganho: input.ganhoDia,
       custo: result.custoTotalDiaReal,
+      createdAt: now,
+      updatedAt: now,
     });
   };
 
   return (
     <ScreenContainer>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Custo Operacional</Text>
         <Text style={styles.subtitle}>
-          Calcule o custo por KM e o lucro real do seu dia de trabalho.
+          Calcule o custo por KM e o lucro real. Os dados do perfil ativo são carregados automaticamente.
         </Text>
 
         {/* Tipo de veículo */}
@@ -60,77 +76,90 @@ export default function OperationalScreen() {
           <SegmentedControl
             options={["Combustão", "Elétrico"]}
             selectedIndex={vehicleIndex}
-            onSelect={(i) => update({ tipoVeiculo: vehicleOptions[i] })}
+            onSelect={handleSwitchVehicle}
           />
+        </View>
 
+        {/* Perfil ativo */}
+        {(activeProfile.precoEnergia > 0 || activeProfile.autonomia > 0) && (
+          <View style={styles.profileBadge}>
+            <Text style={styles.profileBadgeText}>
+              {input.tipoVeiculo === "COMBUSTAO" ? "⛽" : "🔋"} Perfil ativo: R$ {activeProfile.precoEnergia.toFixed(2).replace(".", ",")} · {activeProfile.autonomia} {input.tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
+            </Text>
+          </View>
+        )}
+
+        {/* Inputs de energia */}
+        <View style={styles.section}>
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (L)" : "Preço kWh"}
             value={input.precoCombustivel}
-            onChangeValue={(n) => update({ precoCombustivel: n })}
-            placeholder="0,00"
+            onChangeValue={(n) => updateInput({ precoCombustivel: n })}
+            placeholder={activeProfile.precoEnergia > 0 ? activeProfile.precoEnergia.toFixed(2) : "0,00"}
             suffix="R$"
           />
-
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Autonomia (km/L)" : "Autonomia (km/kWh)"}
             value={input.autonomia}
-            onChangeValue={(n) => update({ autonomia: n })}
-            placeholder="0"
+            onChangeValue={(n) => updateInput({ autonomia: n })}
+            placeholder={activeProfile.autonomia > 0 ? String(activeProfile.autonomia) : "0"}
             suffix={input.tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
           />
+        </View>
 
+        {/* Dados do dia */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Dados do Dia</Text>
           <InputField
-            label="KM Rodados Hoje"
+            label="KM Rodados"
             value={input.kmRodadoDia}
-            onChangeValue={(n) => update({ kmRodadoDia: n })}
+            onChangeValue={(n) => updateInput({ kmRodadoDia: n })}
             placeholder="0"
             suffix="km"
           />
-
           <InputField
             label="Ganho do Dia"
             value={input.ganhoDia}
-            onChangeValue={(n) => update({ ganhoDia: n })}
+            onChangeValue={(n) => updateInput({ ganhoDia: n })}
             placeholder="0,00"
             suffix="R$"
           />
-
           <InputField
             label="Margem Desejada por KM"
             value={input.margemDesejadaPorKm}
-            onChangeValue={(n) => update({ margemDesejadaPorKm: n })}
-            placeholder="0,00"
+            onChangeValue={(n) => updateInput({ margemDesejadaPorKm: n })}
+            placeholder={activeProfile.margemDesejada > 0 ? activeProfile.margemDesejada.toFixed(2) : "0,00"}
             suffix="R$/km"
           />
         </View>
 
-        {/* Gasto real com combustível/recarga */}
+        {/* Abastecimento real */}
         <View style={styles.fuelSection}>
           <Text style={styles.fuelTitle}>
             {input.tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
           </Text>
           <Text style={styles.fuelSubtitle}>
             {input.tipoVeiculo === "COMBUSTAO"
-              ? "Quanto você gastou no posto hoje? (ex: R$ 70,00)"
-              : "Quanto você gastou na recarga elétrica hoje? (ex: R$ 50,00)"}
+              ? "Quanto você gastou no posto hoje? (opcional)"
+              : "Quanto você gastou na recarga elétrica hoje? (opcional)"}
           </Text>
           <InputField
             label={input.tipoVeiculo === "COMBUSTAO" ? "Valor Abastecido" : "Valor Recarregado"}
             value={input.gastoAbastecimento}
-            onChangeValue={(n) => update({ gastoAbastecimento: n })}
+            onChangeValue={(n) => updateInput({ gastoAbastecimento: n })}
             placeholder="0,00 (opcional)"
             suffix="R$"
           />
           {usingRealCost ? (
             <View style={styles.fuelNoteReal}>
               <Text style={styles.fuelNoteRealText}>
-                ✓ Usando custo real: {fmt(input.gastoAbastecimento)} — lucro calculado com este valor
+                ✓ Usando custo real: {fmt(input.gastoAbastecimento)}
               </Text>
             </View>
           ) : (
             <View style={styles.fuelNoteEstimated}>
               <Text style={styles.fuelNoteEstimatedText}>
-                ℹ Usando custo estimado: {fmt(result.custoTotalDiaEstimado)} (preço ÷ autonomia × km)
+                ℹ Usando custo estimado: {fmt(result.custoTotalDiaEstimado)}
               </Text>
             </View>
           )}
@@ -139,7 +168,6 @@ export default function OperationalScreen() {
         {/* Resultados */}
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Resultados</Text>
-
           <ResultCard
             icon="speed"
             title="Custo por KM (estimado)"
@@ -147,19 +175,13 @@ export default function OperationalScreen() {
             subtitle="Baseado no preço e autonomia"
             accentColor="#FF9500"
           />
-
           <ResultCard
             icon="local-gas-station"
             title={usingRealCost ? "Custo Real do Dia" : "Custo Estimado do Dia"}
             value={fmt(result.custoTotalDiaReal)}
-            subtitle={
-              usingRealCost
-                ? `Gasto real informado: ${fmt(input.gastoAbastecimento)}`
-                : `Estimado: ${fmt(result.custoTotalDiaEstimado)}`
-            }
+            subtitle={usingRealCost ? `Gasto real: ${fmt(input.gastoAbastecimento)}` : `Estimado: ${fmt(result.custoTotalDiaEstimado)}`}
             accentColor={usingRealCost ? "#FF453A" : "#FF9500"}
           />
-
           <ResultCard
             icon="trending-up"
             title="Lucro por KM"
@@ -167,7 +189,6 @@ export default function OperationalScreen() {
             subtitle={`Calculado com custo ${usingRealCost ? "real" : "estimado"}`}
             accentColor={result.lucroPorKm >= 0 ? "#30D158" : "#FF453A"}
           />
-
           <ResultCard
             icon="account-balance-wallet"
             title="Lucro Líquido do Dia"
@@ -175,7 +196,6 @@ export default function OperationalScreen() {
             subtitle={`Ganho ${fmt(input.ganhoDia)} − Custo ${fmt(result.custoTotalDiaReal)}`}
             accentColor={result.lucroDia >= 0 ? "#30D158" : "#FF453A"}
           />
-
           <ResultCard
             icon="verified"
             title="Valor Mínimo por KM"
@@ -185,11 +205,31 @@ export default function OperationalScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSaveDay}
-          activeOpacity={0.8}
-        >
+        {/* Data do registro */}
+        <View style={styles.dateSection}>
+          <Text style={styles.dateSectionLabel}>Data do Registro</Text>
+          <View style={styles.dateInputRow}>
+            <TextInput
+              style={styles.dateInput}
+              value={selectedDate}
+              onChangeText={(t: string) => {
+                // Aceita formato AAAA-MM-DD
+                const cleaned = t.replace(/[^0-9-]/g, "").slice(0, 10);
+                setSelectedDate(cleaned);
+              }}
+              placeholder="AAAA-MM-DD"
+              placeholderTextColor="#444444"
+              keyboardType="numbers-and-punctuation"
+              returnKeyType="done"
+              maxLength={10}
+            />
+          </View>
+          <Text style={styles.dateSectionHint}>
+            Você pode registrar dados de qualquer data — hoje ou dias anteriores.
+          </Text>
+        </View>
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSaveDay} activeOpacity={0.8}>
           <Text style={styles.saveButtonText}>Salvar Dia nos Relatórios</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -200,87 +240,48 @@ export default function OperationalScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  title: {
-    color: "#FFFFFF",
-    fontSize: 32,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: "#8E8E93",
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  section: { marginBottom: 8 },
+  title: { color: "#FFFFFF", fontSize: 32, fontWeight: "700", letterSpacing: -0.5, marginBottom: 8 },
+  subtitle: { color: "#8E8E93", fontSize: 15, lineHeight: 22, marginBottom: 24 },
+  section: { marginBottom: 20 },
   sectionLabel: {
-    color: "#8E8E93",
-    fontSize: 13,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    color: "#8E8E93", fontSize: 13, fontWeight: "500",
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8,
   },
+  profileBadge: {
+    backgroundColor: "rgba(10, 132, 255, 0.1)", borderRadius: 10,
+    padding: 10, marginBottom: 16, borderWidth: 1,
+    borderColor: "rgba(10, 132, 255, 0.3)",
+  },
+  profileBadgeText: { color: "#0A84FF", fontSize: 13, fontWeight: "500" },
   fuelSection: {
-    backgroundColor: "#111111",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: "#1C1C1E",
+    backgroundColor: "#111111", borderRadius: 16, padding: 16,
+    marginBottom: 28, borderWidth: 1, borderColor: "#1C1C1E",
   },
-  fuelTitle: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  fuelSubtitle: {
-    color: "#8E8E93",
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  fuelNoteReal: {
-    backgroundColor: "rgba(0, 212, 170, 0.1)",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: -4,
-  },
-  fuelNoteRealText: {
-    color: "#00D4AA",
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  fuelNoteEstimated: {
-    backgroundColor: "rgba(255, 149, 0, 0.1)",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: -4,
-  },
-  fuelNoteEstimatedText: {
-    color: "#FF9500",
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  fuelTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "700", marginBottom: 4 },
+  fuelSubtitle: { color: "#8E8E93", fontSize: 13, lineHeight: 18, marginBottom: 16 },
+  fuelNoteReal: { backgroundColor: "rgba(0, 212, 170, 0.1)", borderRadius: 8, padding: 10, marginTop: -4 },
+  fuelNoteRealText: { color: "#00D4AA", fontSize: 13, fontWeight: "500" },
+  fuelNoteEstimated: { backgroundColor: "rgba(255, 149, 0, 0.1)", borderRadius: 8, padding: 10, marginTop: -4 },
+  fuelNoteEstimatedText: { color: "#FF9500", fontSize: 13, fontWeight: "500" },
   resultsSection: { marginBottom: 24 },
-  resultsTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 16,
+  resultsTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "700", marginBottom: 16 },
+  dateSection: {
+    backgroundColor: "#111111", borderRadius: 16, padding: 16,
+    marginBottom: 20, borderWidth: 1, borderColor: "#1C1C1E",
   },
+  dateSectionLabel: { color: "#FFFFFF", fontSize: 16, fontWeight: "600", marginBottom: 8 },
+  dateSectionHint: { color: "#8E8E93", fontSize: 12, lineHeight: 18, marginTop: 4 },
   saveButton: {
-    backgroundColor: "#00D4AA",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 20,
+    backgroundColor: "#00D4AA", borderRadius: 14,
+    paddingVertical: 16, alignItems: "center", marginBottom: 20,
   },
-  saveButtonText: {
-    color: "#000000",
-    fontSize: 17,
-    fontWeight: "700",
+  saveButtonText: { color: "#000000", fontSize: 17, fontWeight: "700" },
+  dateInputRow: {
+    backgroundColor: "#111111", borderRadius: 12, borderWidth: 1,
+    borderColor: "#1C1C1E", paddingHorizontal: 16, height: 50,
+    justifyContent: "center",
+  },
+  dateInput: {
+    color: "#FFFFFF", fontSize: 17, fontWeight: "600",
   },
 });
