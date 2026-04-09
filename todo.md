@@ -30,8 +30,3 @@
 - [x] Adicionar campo de seguro nos Custos Fixos (tipo e valor)
 - [x] Incluir seguro em todos os cálculos de custo fixo
 - [x] Corrigir cálculo operacional: gasto real com combustível/recarga entra no custo total do dia e lucro por KM
-- [x] Criar RealCostUseCase (custoPorKmReal = valorAbastecido / kmRodado; lucroPorKmReal = valorPorKmRecebido - custoPorKmReal)
-- [x] Criar enum CalculationMode (ESTIMATED | REAL) nos tipos
-- [x] Atualizar contexto global com calculationMode e setCalculationMode
-- [x] Atualizar tela Operacional com toggle Estimado/Real e campos específicos por modo
-- [x] Atualizar testes unitários para cobrir RealCostUseCase

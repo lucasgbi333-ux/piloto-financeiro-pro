@@ -1,18 +1,7 @@
 import { describe, it, expect } from "vitest";
-import {
-  calculateFixedCosts,
-  calculateOperationalCost,
-  calculateRealCost,
-  groupReports,
-} from "../use-cases";
-import type {
-  FixedCostInput,
-  OperationalInput,
-  RealCostInput,
-  DailyRecord,
-} from "../types";
+import { calculateFixedCosts, calculateOperationalCost, groupReports } from "../use-cases";
+import type { FixedCostInput, OperationalInput, DailyRecord } from "../types";
 
-// ===== CUSTOS FIXOS =====
 describe("calculateFixedCosts", () => {
   it("should calculate monthly, annual and daily costs with seguro anual", () => {
     const input: FixedCostInput = {
@@ -26,7 +15,10 @@ describe("calculateFixedCosts", () => {
       tipoSeguro: "ANUAL",
     };
     const result = calculateFixedCosts(input);
-    // ipvaMensal=100, financiamento=800, seguroMensal=200, internet=100, outros=50 → 1250
+    // ipvaMensal = 1200/12 = 100
+    // veiculoCusto = 800 (financiamento)
+    // seguroMensal = 2400/12 = 200
+    // total = 100 + 800 + 200 + 100 + 50 = 1250
     expect(result.custoMensalTotal).toBeCloseTo(1250, 2);
     expect(result.custoAnualTotal).toBeCloseTo(15000, 2);
     expect(result.custoDiarioNecessario).toBeCloseTo(1250 / 30, 2);
@@ -60,11 +52,11 @@ describe("calculateFixedCosts", () => {
       tipoSeguro: "ANUAL",
     };
     const result = calculateFixedCosts(input);
+    // aluguelMensal = 500 * 4.33 = 2165
     expect(result.custoMensalTotal).toBeCloseTo(2165, 2);
   });
 });
 
-// ===== CUSTO OPERACIONAL (MODO ESTIMADO) =====
 describe("calculateOperationalCost", () => {
   it("should use gasto real (abastecimento) when provided", () => {
     const input: OperationalInput = {
@@ -74,14 +66,20 @@ describe("calculateOperationalCost", () => {
       kmRodadoDia: 200,
       ganhoDia: 300,
       margemDesejadaPorKm: 0.5,
-      gastoAbastecimento: 70,
+      gastoAbastecimento: 70, // gasto real informado
     };
     const result = calculateOperationalCost(input);
+    // custoPorKm = 6/12 = 0.5 (estimado)
     expect(result.custoPorKm).toBeCloseTo(0.5, 3);
+    // custoTotalDiaEstimado = 0.5 * 200 = 100
     expect(result.custoTotalDiaEstimado).toBeCloseTo(100, 2);
+    // custoTotalDiaReal = 70 (gasto real informado)
     expect(result.custoTotalDiaReal).toBeCloseTo(70, 2);
+    // lucroDia = 300 - 70 = 230
     expect(result.lucroDia).toBeCloseTo(230, 2);
+    // lucroPorKm = 230 / 200 = 1.15
     expect(result.lucroPorKm).toBeCloseTo(1.15, 3);
+    // valorMinimoKm = 0.5 + 0.5 = 1.0
     expect(result.valorMinimoKm).toBeCloseTo(1.0, 3);
   });
 
@@ -96,8 +94,11 @@ describe("calculateOperationalCost", () => {
       gastoAbastecimento: 0,
     };
     const result = calculateOperationalCost(input);
+    // custoTotalDiaReal = estimado = 100
     expect(result.custoTotalDiaReal).toBeCloseTo(100, 2);
+    // lucroDia = 300 - 100 = 200
     expect(result.lucroDia).toBeCloseTo(200, 2);
+    // lucroPorKm = 200 / 200 = 1.0
     expect(result.lucroPorKm).toBeCloseTo(1.0, 3);
   });
 
@@ -116,76 +117,27 @@ describe("calculateOperationalCost", () => {
     expect(result.custoTotalDiaEstimado).toBe(0);
     expect(result.custoTotalDiaReal).toBe(0);
   });
-});
 
-// ===== CUSTO REAL (RealCostUseCase) =====
-describe("calculateRealCost", () => {
-  it("should calculate custoPorKmReal and lucroPorKmReal correctly", () => {
-    const input: RealCostInput = {
-      kmRodado: 200,
-      valorAbastecido: 70,
-      valorPorKmRecebido: 1.5,
+  it("should calculate electric vehicle with real charge cost", () => {
+    const input: OperationalInput = {
+      tipoVeiculo: "ELETRICO",
+      precoCombustivel: 0.8,
+      autonomia: 6,
+      kmRodadoDia: 150,
+      ganhoDia: 250,
+      margemDesejadaPorKm: 0.3,
+      gastoAbastecimento: 50, // recarga real
     };
-    const result = calculateRealCost(input);
-    // custoPorKmReal = 70 / 200 = 0.35
-    expect(result.isValid).toBe(true);
-    expect(result.custoPorKmReal).toBeCloseTo(0.35, 4);
-    // lucroPorKmReal = 1.5 - 0.35 = 1.15
-    expect(result.lucroPorKmReal).toBeCloseTo(1.15, 4);
-    expect(result.errorMessage).toBeUndefined();
-  });
-
-  it("should return error when kmRodado <= 0", () => {
-    const input: RealCostInput = {
-      kmRodado: 0,
-      valorAbastecido: 70,
-      valorPorKmRecebido: 1.5,
-    };
-    const result = calculateRealCost(input);
-    expect(result.isValid).toBe(false);
-    expect(result.custoPorKmReal).toBe(0);
-    expect(result.lucroPorKmReal).toBe(0);
-    expect(result.errorMessage).toBeTruthy();
-  });
-
-  it("should return error when valorAbastecido <= 0", () => {
-    const input: RealCostInput = {
-      kmRodado: 200,
-      valorAbastecido: 0,
-      valorPorKmRecebido: 1.5,
-    };
-    const result = calculateRealCost(input);
-    expect(result.isValid).toBe(false);
-    expect(result.custoPorKmReal).toBe(0);
-    expect(result.errorMessage).toBeTruthy();
-  });
-
-  it("should handle negative lucroPorKmReal (prejuízo)", () => {
-    const input: RealCostInput = {
-      kmRodado: 100,
-      valorAbastecido: 200, // custo alto
-      valorPorKmRecebido: 1.0,
-    };
-    const result = calculateRealCost(input);
-    // custoPorKmReal = 200 / 100 = 2.0
-    // lucroPorKmReal = 1.0 - 2.0 = -1.0 (prejuízo)
-    expect(result.isValid).toBe(true);
-    expect(result.custoPorKmReal).toBeCloseTo(2.0, 4);
-    expect(result.lucroPorKmReal).toBeCloseTo(-1.0, 4);
-  });
-
-  it("should handle negative kmRodado as invalid", () => {
-    const input: RealCostInput = {
-      kmRodado: -50,
-      valorAbastecido: 70,
-      valorPorKmRecebido: 1.5,
-    };
-    const result = calculateRealCost(input);
-    expect(result.isValid).toBe(false);
+    const result = calculateOperationalCost(input);
+    // custoTotalDiaReal = 50 (recarga real)
+    expect(result.custoTotalDiaReal).toBeCloseTo(50, 2);
+    // lucroDia = 250 - 50 = 200
+    expect(result.lucroDia).toBeCloseTo(200, 2);
+    // lucroPorKm = 200 / 150 = 1.333
+    expect(result.lucroPorKm).toBeCloseTo(1.333, 3);
   });
 });
 
-// ===== RELATÓRIOS =====
 describe("groupReports", () => {
   const records: DailyRecord[] = [
     { date: "2025-01-15", kmRodado: 200, ganho: 300, custo: 100 },
@@ -207,6 +159,7 @@ describe("groupReports", () => {
     expect(result).toHaveLength(2);
     const jan = result.find((r) => r.period.startsWith("Jan"));
     expect(jan).toBeDefined();
+    // Jan: (300-100) + (280-90) = 200 + 190 = 390
     expect(jan!.totalProfit).toBeCloseTo(390, 2);
   });
 

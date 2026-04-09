@@ -4,20 +4,12 @@ import type {
   FixedCostResult,
   OperationalInput,
   OperationalResult,
-  RealCostInput,
-  RealCostResult,
-  CalculationMode,
   DailyRecord,
   ReportItem,
   PeriodFilter,
   DashboardState,
 } from "./types";
-import {
-  calculateFixedCosts,
-  calculateOperationalCost,
-  calculateRealCost,
-  groupReports,
-} from "./use-cases";
+import { calculateFixedCosts, calculateOperationalCost, groupReports } from "./use-cases";
 import {
   saveFixedCosts,
   loadFixedCosts,
@@ -33,12 +25,6 @@ interface AppState {
   fixedCostResult: FixedCostResult;
   operationalInput: OperationalInput;
   operationalResult: OperationalResult;
-  /** Modo de cálculo ativo: ESTIMATED (padrão) ou REAL */
-  calculationMode: CalculationMode;
-  /** Inputs do Modo Real */
-  realCostInput: RealCostInput;
-  /** Resultado do Modo Real */
-  realCostResult: RealCostResult;
   dailyRecords: DailyRecord[];
   periodFilter: PeriodFilter;
   reports: ReportItem[];
@@ -67,12 +53,6 @@ const defaultOperationalInput: OperationalInput = {
   gastoAbastecimento: 0,
 };
 
-const defaultRealCostInput: RealCostInput = {
-  kmRodado: 0,
-  valorAbastecido: 0,
-  valorPorKmRecebido: 0,
-};
-
 function computeDashboard(
   fixedResult: FixedCostResult,
   opResult: OperationalResult,
@@ -88,15 +68,11 @@ function computeDashboard(
 function buildInitialState(): AppState {
   const fixedResult = calculateFixedCosts(defaultFixedInput);
   const opResult = calculateOperationalCost(defaultOperationalInput);
-  const realResult = calculateRealCost(defaultRealCostInput);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
     operationalInput: defaultOperationalInput,
     operationalResult: opResult,
-    calculationMode: "ESTIMATED",
-    realCostInput: defaultRealCostInput,
-    realCostResult: realResult,
     dailyRecords: [],
     periodFilter: "DAY",
     reports: [],
@@ -110,8 +86,6 @@ type Action =
   | { type: "LOAD_ALL"; fixedInput: FixedCostInput; opInput: OperationalInput; records: DailyRecord[] }
   | { type: "SET_FIXED_COSTS"; input: FixedCostInput }
   | { type: "SET_OPERATIONAL"; input: OperationalInput }
-  | { type: "SET_CALCULATION_MODE"; mode: CalculationMode }
-  | { type: "SET_REAL_COST_INPUT"; input: RealCostInput }
   | { type: "ADD_DAILY_RECORD"; record: DailyRecord }
   | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter };
 
@@ -153,21 +127,6 @@ function reducer(state: AppState, action: Action): AppState {
         dashboard: computeDashboard(state.fixedCostResult, or2, action.input),
       };
     }
-    case "SET_CALCULATION_MODE": {
-      // Apenas altera o modo; os cálculos já estão disponíveis em ambos os states
-      return {
-        ...state,
-        calculationMode: action.mode,
-      };
-    }
-    case "SET_REAL_COST_INPUT": {
-      const realResult = calculateRealCost(action.input);
-      return {
-        ...state,
-        realCostInput: action.input,
-        realCostResult: realResult,
-      };
-    }
     case "ADD_DAILY_RECORD": {
       const recs = [...state.dailyRecords];
       const idx = recs.findIndex((r) => r.date === action.record.date);
@@ -199,10 +158,6 @@ interface AppContextValue {
   state: AppState;
   setFixedCosts: (input: FixedCostInput) => void;
   setOperational: (input: OperationalInput) => void;
-  /** Alterna entre modo Estimado e modo Real */
-  setCalculationMode: (mode: CalculationMode) => void;
-  /** Atualiza os inputs do Modo Real e recalcula */
-  setRealCostInput: (input: RealCostInput) => void;
   addDailyRecord: (record: DailyRecord) => void;
   setPeriodFilter: (filter: PeriodFilter) => void;
 }
@@ -239,14 +194,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveOperational(input);
   }, []);
 
-  const setCalculationMode = useCallback((mode: CalculationMode) => {
-    dispatch({ type: "SET_CALCULATION_MODE", mode });
-  }, []);
-
-  const setRealCostInput = useCallback((input: RealCostInput) => {
-    dispatch({ type: "SET_REAL_COST_INPUT", input });
-  }, []);
-
   const addDailyRecord = useCallback((record: DailyRecord) => {
     dispatch({ type: "ADD_DAILY_RECORD", record });
     saveDailyRecord(record);
@@ -258,15 +205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{
-        state,
-        setFixedCosts,
-        setOperational,
-        setCalculationMode,
-        setRealCostInput,
-        addDailyRecord,
-        setPeriodFilter,
-      }}
+      value={{ state, setFixedCosts, setOperational, addDailyRecord, setPeriodFilter }}
     >
       {children}
     </AppContext.Provider>

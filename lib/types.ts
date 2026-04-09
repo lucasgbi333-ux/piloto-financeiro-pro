@@ -27,35 +27,6 @@ export interface FixedCostResult {
 // ===== CUSTO OPERACIONAL =====
 export type VehicleType = "COMBUSTAO" | "ELETRICO";
 
-/**
- * Modo de cálculo operacional:
- * - ESTIMATED: baseado em preço do combustível e autonomia (cálculo teórico)
- * - REAL: baseado no valor abastecido real e km rodados (cálculo real)
- */
-export type CalculationMode = "ESTIMATED" | "REAL";
-
-/** Inputs específicos do Modo Real */
-export interface RealCostInput {
-  /** KM rodados no período */
-  kmRodado: number;
-  /** Valor total gasto no abastecimento ou recarga elétrica */
-  valorAbastecido: number;
-  /** Valor recebido por KM rodado (ganho total / km) */
-  valorPorKmRecebido: number;
-}
-
-/** Resultado do Modo Real */
-export interface RealCostResult {
-  /** Custo real por KM = valorAbastecido / kmRodado */
-  custoPorKmReal: number;
-  /** Lucro real por KM = valorPorKmRecebido - custoPorKmReal */
-  lucroPorKmReal: number;
-  /** Indica se os inputs são válidos para cálculo */
-  isValid: boolean;
-  /** Mensagem de erro se isValid = false */
-  errorMessage?: string;
-}
-
 export interface OperationalInput {
   tipoVeiculo: VehicleType;
   /** Preço por litro (combustão) ou por kWh (elétrico) */
