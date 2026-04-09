@@ -114,3 +114,6 @@
 - [x] Configurar Deep Link pilotofinanceiro:// no app.config.ts para APK
 - [x] Stripe: atualizar success_url para pilotofinanceiro://checkout-success
 - [x] Handler de Deep Link no app para processar retorno do Stripe
+- [x] Webhook: adicionar evento customer.subscription.created (status trialing) para marcar ativo=true
+- [x] App: re-verificar status de assinatura após retorno do checkout (deep link)
+- [x] Paywall: botão "Já assinei — verificar novamente" que consulta Supabase e libera acesso

@@ -96,6 +96,19 @@ async function upsertSubscription(
   }
 }
 
+// ─── Get email from Stripe customer ───
+async function getEmailFromCustomer(stripe: Stripe, customerId: string): Promise<string | null> {
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (customer && !customer.deleted && customer.email) {
+      return customer.email;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Register Stripe routes ───
 export function registerStripeRoutes(app: Express) {
   const priceId = process.env.STRIPE_PRICE;
@@ -125,20 +138,9 @@ export function registerStripeRoutes(app: Express) {
         customerId = customer.id;
       }
 
-      // Determine success/cancel URLs
-      // For APK: use custom deep link scheme (pilotofinanceiro://) so the app opens directly
-      // For web: use the origin with query params
-      const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://pilotofin-jwjxudxa.manus.space";
-      const isWebRequest = origin.startsWith("http");
-
       // Deep link for APK: pilotofinanceiro://checkout-success
-      // Web fallback: /?stripe_success=true
-      const successUrl = isWebRequest
-        ? `pilotofinanceiro://checkout-success`
-        : `${origin}/?stripe_success=true`;
-      const cancelUrl = isWebRequest
-        ? `pilotofinanceiro://checkout-canceled`
-        : `${origin}/?stripe_canceled=true`;
+      const successUrl = `pilotofinanceiro://checkout-success`;
+      const cancelUrl = `pilotofinanceiro://checkout-canceled`;
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
@@ -147,6 +149,7 @@ export function registerStripeRoutes(app: Express) {
         line_items: [{ price: priceId, quantity: 1 }],
         subscription_data: {
           trial_period_days: 7,
+          metadata: { email },
         },
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -230,44 +233,98 @@ export function registerStripeWebhook(app: Express) {
         console.log(`[Stripe Webhook] Received event: ${event.type}`);
 
         switch (event.type) {
+          // ── Checkout completed (trial or paid) ──
           case "checkout.session.completed": {
             const session = event.data.object as Stripe.Checkout.Session;
             const email = session.metadata?.email || session.customer_email;
             if (email) {
+              // Mark as active immediately — trial starts now
               await upsertSubscription(email, {
                 ativo: true,
                 plano: "mensal",
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: session.subscription as string,
               });
+              console.log(`[Stripe Webhook] checkout.session.completed → ativo=true for ${email}`);
+            } else {
+              console.warn("[Stripe Webhook] checkout.session.completed: no email found in metadata or customer_email");
             }
             break;
           }
 
+          // ── Subscription created (handles trial start) ──
+          case "customer.subscription.created": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+            // Email from subscription metadata (set at checkout) or customer lookup
+            const metaEmailCreated = subscription.metadata?.email;
+            const emailCreated = metaEmailCreated || await getEmailFromCustomer(stripe, customerId);
+            if (emailCreated) {
+              // trialing, active → mark as active
+              const isActive = ["trialing", "active"].includes(subscription.status);
+              await upsertSubscription(emailCreated, {
+                ativo: isActive,
+                plano: "mensal",
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+              });
+              console.log(`[Stripe Webhook] customer.subscription.created (${subscription.status}) → ativo=${isActive} for ${emailCreated}`);
+            } else {
+              console.warn("[Stripe Webhook] customer.subscription.created: could not resolve email");
+            }
+            break;
+          }
+
+          // ── Subscription updated (e.g., trial ended, plan changed) ──
+          case "customer.subscription.updated": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+            const metaEmailUpdated = subscription.metadata?.email;
+            const emailUpdated = metaEmailUpdated || await getEmailFromCustomer(stripe, customerId);
+            if (emailUpdated) {
+              const isActive = ["trialing", "active"].includes(subscription.status);
+              await upsertSubscription(emailUpdated, {
+                ativo: isActive,
+                plano: "mensal",
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscription.id,
+              });
+              console.log(`[Stripe Webhook] customer.subscription.updated (${subscription.status}) → ativo=${isActive} for ${emailUpdated}`);
+            }
+            break;
+          }
+
+          // ── Invoice paid (renewal) ──
           case "invoice.paid": {
             const invoice = event.data.object as Stripe.Invoice;
             const email = invoice.customer_email;
             if (email) {
               await upsertSubscription(email, { ativo: true, plano: "mensal" });
+              console.log(`[Stripe Webhook] invoice.paid → ativo=true for ${email}`);
             }
             break;
           }
 
+          // ── Invoice payment failed ──
           case "invoice.payment_failed": {
             const invoice = event.data.object as Stripe.Invoice;
             const email = invoice.customer_email;
             if (email) {
               await upsertSubscription(email, { ativo: false, plano: "mensal" });
+              console.log(`[Stripe Webhook] invoice.payment_failed → ativo=false for ${email}`);
             }
             break;
           }
 
+          // ── Subscription deleted/cancelled ──
           case "customer.subscription.deleted": {
             const subscription = event.data.object as Stripe.Subscription;
-            // Get customer email
-            const customer = await stripe.customers.retrieve(subscription.customer as string);
-            if (customer && !customer.deleted && customer.email) {
-              await upsertSubscription(customer.email, { ativo: false, plano: "mensal" });
+            const customerId = subscription.customer as string;
+            const metaEmailDeleted = subscription.metadata?.email;
+            const emailDeleted = metaEmailDeleted || await getEmailFromCustomer(stripe, customerId);
+            if (emailDeleted) {
+              await upsertSubscription(emailDeleted, { ativo: false, plano: "mensal" });
+              console.log(`[Stripe Webhook] customer.subscription.deleted → ativo=false for ${emailDeleted}`);
             }
             break;
           }

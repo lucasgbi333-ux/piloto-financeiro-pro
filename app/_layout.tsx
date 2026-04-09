@@ -9,7 +9,7 @@ import { Platform, Linking } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AppProvider } from "@/lib/app-context";
-import { SupabaseAuthProvider } from "@/lib/supabase-auth-provider";
+import { SupabaseAuthProvider, useSupabaseAuth } from "@/lib/supabase-auth-provider";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -33,6 +33,7 @@ export const unstable_settings = {
 // For APK: handles pilotofinanceiro://checkout-success deep links
 function StripeRedirectHandler() {
   const params = useLocalSearchParams<{ stripe_success?: string; stripe_canceled?: string }>();
+  const { checkSubscription, session } = useSupabaseAuth();
 
   // Handle web query params (/?stripe_success=true)
   useEffect(() => {
@@ -48,11 +49,25 @@ function StripeRedirectHandler() {
   useEffect(() => {
     if (Platform.OS === "web") return;
 
+    const handleCheckoutSuccess = async () => {
+      // Re-check subscription status with retry logic
+      // The webhook may take a moment to process, so we retry a few times
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await checkSubscription();
+        // Small delay between retries to allow webhook to process
+        if (attempt < 4) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+      }
+      // After checking, navigate to login so the paywall can redirect if subscribed
+      router.replace({ pathname: "/login", params: { success: "true" } });
+    };
+
     const handleDeepLink = (event: { url: string }) => {
       const url = event.url;
       if (url.startsWith("pilotofinanceiro://checkout-success")) {
-        // Payment successful: redirect to login with success param
-        router.replace({ pathname: "/login", params: { success: "true" } });
+        // Payment successful: re-check subscription and redirect
+        handleCheckoutSuccess();
       } else if (url.startsWith("pilotofinanceiro://checkout-canceled")) {
         // Payment canceled: redirect to login with canceled param
         router.replace({ pathname: "/login", params: { canceled: "true" } });
@@ -68,7 +83,7 @@ function StripeRedirectHandler() {
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [checkSubscription]);
 
   return null;
 }

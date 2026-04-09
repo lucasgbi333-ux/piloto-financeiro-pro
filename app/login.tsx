@@ -24,6 +24,8 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState("");
 
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
@@ -222,16 +224,32 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {/* Refresh subscription status */}
+            {verifyMsg ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{verifyMsg}</Text>
+              </View>
+            ) : null}
             <TouchableOpacity
-              style={styles.refreshBtn}
+              style={[styles.refreshBtn, verifyLoading && { opacity: 0.6 }]}
               onPress={async () => {
-                setCheckoutLoading(true);
+                if (verifyLoading) return;
+                setVerifyLoading(true);
+                setVerifyMsg("");
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 await checkSubscription();
-                setCheckoutLoading(false);
+                setVerifyLoading(false);
+                // If still not subscribed after checking, show message
+                // (if subscribed, the useEffect above will redirect automatically)
+                setVerifyMsg("Assinatura não encontrada. Se você acabou de assinar, aguarde alguns segundos e tente novamente.");
               }}
               activeOpacity={0.7}
+              disabled={verifyLoading}
             >
-              <Text style={styles.refreshBtnText}>Já assinei — verificar novamente</Text>
+              {verifyLoading ? (
+                <ActivityIndicator color="#8E8E93" size="small" />
+              ) : (
+                <Text style={styles.refreshBtnText}>Já assinei — verificar novamente</Text>
+              )}
             </TouchableOpacity>
           </View>
 
