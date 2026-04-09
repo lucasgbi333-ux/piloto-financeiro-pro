@@ -126,13 +126,19 @@ export function registerStripeRoutes(app: Express) {
       }
 
       // Determine success/cancel URLs
-      // Use the app's published domain if available, otherwise use the request origin
+      // For APK: use custom deep link scheme (pilotofinanceiro://) so the app opens directly
+      // For web: use the origin with query params
       const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://pilotofin-jwjxudxa.manus.space";
+      const isWebRequest = origin.startsWith("http");
 
-      // For static Expo web apps, all routes are served from the root index.html
-      // We use the root path with query params so the app can detect and handle them
-      const successUrl = `${origin}/?stripe_success=true`;
-      const cancelUrl = `${origin}/?stripe_canceled=true`;
+      // Deep link for APK: pilotofinanceiro://checkout-success
+      // Web fallback: /?stripe_success=true
+      const successUrl = isWebRequest
+        ? `pilotofinanceiro://checkout-success`
+        : `${origin}/?stripe_success=true`;
+      const cancelUrl = isWebRequest
+        ? `pilotofinanceiro://checkout-canceled`
+        : `${origin}/?stripe_canceled=true`;
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,

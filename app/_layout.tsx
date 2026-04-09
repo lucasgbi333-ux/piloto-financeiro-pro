@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { Platform, Linking } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AppProvider } from "@/lib/app-context";
@@ -28,12 +28,13 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
-// Handles Stripe redirect params at the root level (for static web export)
-// When Stripe redirects to /?stripe_success=true, this component detects it
-// and redirects to /login?success=true so the login screen can handle it
+// Handles Stripe redirect params at the root level
+// For web: detects /?stripe_success=true query params
+// For APK: handles pilotofinanceiro://checkout-success deep links
 function StripeRedirectHandler() {
   const params = useLocalSearchParams<{ stripe_success?: string; stripe_canceled?: string }>();
 
+  // Handle web query params (/?stripe_success=true)
   useEffect(() => {
     if (Platform.OS !== "web") return;
     if (params.stripe_success === "true") {
@@ -42,6 +43,32 @@ function StripeRedirectHandler() {
       router.replace({ pathname: "/login", params: { canceled: "true" } });
     }
   }, [params.stripe_success, params.stripe_canceled]);
+
+  // Handle APK deep links (pilotofinanceiro://checkout-success)
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    const handleDeepLink = (event: { url: string }) => {
+      const url = event.url;
+      if (url.startsWith("pilotofinanceiro://checkout-success")) {
+        // Payment successful: redirect to login with success param
+        router.replace({ pathname: "/login", params: { success: "true" } });
+      } else if (url.startsWith("pilotofinanceiro://checkout-canceled")) {
+        // Payment canceled: redirect to login with canceled param
+        router.replace({ pathname: "/login", params: { canceled: "true" } });
+      }
+    };
+
+    // Handle deep link when app is already open
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+
+    // Handle deep link when app is opened from a cold start
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return null;
 }

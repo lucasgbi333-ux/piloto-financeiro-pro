@@ -26,6 +26,9 @@ const bundleId =
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
+// Custom deep link scheme for Stripe redirects (APK)
+const customScheme = "pilotofinanceiro";
+
 const env = {
   // App branding - update these values directly (do not use env vars)
   appName: "Piloto Financeiro Pro",
@@ -34,6 +37,7 @@ const env = {
   // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663474035785/jwJXudXaFFHWrafMZSS4a7/icon-nWzFvgau7UYvRfZCxaLyg8.png",
   scheme: schemeFromBundleId,
+  customScheme,
   iosBundleId: bundleId,
   androidPackage: bundleId,
 };
@@ -44,7 +48,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: env.scheme,
+  scheme: [env.scheme, env.customScheme],
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -73,6 +77,21 @@ const config: ExpoConfig = {
           {
             scheme: env.scheme,
             host: "*",
+          },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+      {
+        // Custom scheme for Stripe payment redirects
+        action: "VIEW",
+        data: [
+          {
+            scheme: env.customScheme,
+            host: "checkout-success",
+          },
+          {
+            scheme: env.customScheme,
+            host: "checkout-canceled",
           },
         ],
         category: ["BROWSABLE", "DEFAULT"],

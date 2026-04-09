@@ -110,3 +110,7 @@
 - [x] Paywall: atualizar texto para refletir o trial gratuito de 7 dias
 - [x] Corrigir redirecionamento pós-pagamento do Stripe (success_url retorna "Not Found")
 - [x] Configurar SPA fallback no servidor Express (servir index.html em qualquer rota não-API)
+- [x] Corrigir erro de build do Docker (expo export falhando no CI)
+- [x] Configurar Deep Link pilotofinanceiro:// no app.config.ts para APK
+- [x] Stripe: atualizar success_url para pilotofinanceiro://checkout-success
+- [x] Handler de Deep Link no app para processar retorno do Stripe

@@ -2,8 +2,6 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import path from "path";
-import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -74,28 +72,6 @@ async function startServer() {
       createContext,
     }),
   );
-
-  // Serve static web app files (Expo web export)
-  // The web build is in the 'web-build' directory (created by 'expo export')
-  const webBuildPath = path.join(process.cwd(), "web-build");
-  if (fs.existsSync(webBuildPath)) {
-    // Serve static assets
-    app.use(express.static(webBuildPath));
-    // SPA fallback: serve index.html for any non-API route
-    // This allows client-side routing (e.g., /?stripe_success=true) to work
-    app.get("*", (req, res) => {
-      if (!req.path.startsWith("/api/")) {
-        res.sendFile(path.join(webBuildPath, "index.html"));
-      } else {
-        res.status(404).json({ error: "Not found" });
-      }
-    });
-  } else {
-    // Fallback: serve a simple redirect page if web build doesn't exist
-    app.get("/", (_req, res) => {
-      res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Piloto Financeiro Pro</title><meta http-equiv="refresh" content="0;url=/"></head><body><p>Carregando...</p></body></html>`);
-    });
-  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
