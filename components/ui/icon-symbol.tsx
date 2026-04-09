@@ -16,6 +16,8 @@ const MAPPING = {
   "chart.bar.fill": "bar-chart",
   "person.fill": "person",
   "list.bullet": "list",
+  "creditcard.fill": "credit-card",
+  "calendar.badge.plus": "event",
 } as IconMapping;
 
 export function IconSymbol({

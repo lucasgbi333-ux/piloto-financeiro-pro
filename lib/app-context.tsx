@@ -50,11 +50,8 @@ interface AppState {
   fixedCostResult: FixedCostResult;
   operationalInput: OperationalInput;
   operationalResult: OperationalResult;
-  /** Perfis de veículo (um por tipo: COMBUSTAO e ELETRICO) */
   vehicleProfiles: VehicleProfile[];
-  /** Tipo de veículo ativo */
   activeVehicleType: VehicleType;
-  /** Perfil ativo (derivado de vehicleProfiles + activeVehicleType) */
   activeProfile: VehicleProfile;
   dailyRecords: DailyRecord[];
   transactions: Transaction[];
@@ -96,7 +93,8 @@ function computeDashboard(
   return {
     minPerKm: opResult.valorMinimoKm,
     requiredDaily: fixedResult.custoDiarioNecessario,
-    dailyProfit: opResult.lucroDia,
+    // Lucro líquido já descontando os custos fixos diluídos do dia
+    dailyProfit: opResult.lucroDiaLiquido,
   };
 }
 
@@ -108,7 +106,7 @@ function buildInitialState(): AppState {
   ];
   const activeType: VehicleType = "COMBUSTAO";
   const activeProfile = getActiveProfile(defaultProfiles, activeType);
-  const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile);
+  const opResult = calculateOperationalCost(defaultOperationalInput, activeProfile, fixedResult.custoFixoDiario);
   return {
     fixedCostInput: defaultFixedInput,
     fixedCostResult: fixedResult,
@@ -157,7 +155,7 @@ function reducer(state: AppState, action: Action): AppState {
         : [getDefaultVehicleProfile("COMBUSTAO"), getDefaultVehicleProfile("ELETRICO")];
       const activeType = action.activeVehicleType;
       const activeProfile = getActiveProfile(profiles, activeType);
-      const or2 = calculateOperationalCost(oi, activeProfile);
+      const or2 = calculateOperationalCost(oi, activeProfile, fr.custoFixoDiario);
       const recs = action.records;
       return {
         ...state,
@@ -177,15 +175,17 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "SET_FIXED_COSTS": {
       const fr = calculateFixedCosts(action.input);
+      const or2 = calculateOperationalCost(state.operationalInput, state.activeProfile, fr.custoFixoDiario);
       return {
         ...state,
         fixedCostInput: action.input,
         fixedCostResult: fr,
-        dashboard: computeDashboard(fr, state.operationalResult),
+        operationalResult: or2,
+        dashboard: computeDashboard(fr, or2),
       };
     }
     case "SET_OPERATIONAL": {
-      const or2 = calculateOperationalCost(action.input, state.activeProfile);
+      const or2 = calculateOperationalCost(action.input, state.activeProfile, state.fixedCostResult.custoFixoDiario);
       return {
         ...state,
         operationalInput: action.input,
@@ -197,7 +197,8 @@ function reducer(state: AppState, action: Action): AppState {
       const activeProfile = getActiveProfile(state.vehicleProfiles, action.vehicleType);
       const or2 = calculateOperationalCost(
         { ...state.operationalInput, tipoVeiculo: action.vehicleType },
-        activeProfile
+        activeProfile,
+        state.fixedCostResult.custoFixoDiario
       );
       return {
         ...state,
@@ -217,7 +218,7 @@ function reducer(state: AppState, action: Action): AppState {
         profiles.push(action.profile);
       }
       const activeProfile = getActiveProfile(profiles, state.activeVehicleType);
-      const or2 = calculateOperationalCost(state.operationalInput, activeProfile);
+      const or2 = calculateOperationalCost(state.operationalInput, activeProfile, state.fixedCostResult.custoFixoDiario);
       return {
         ...state,
         vehicleProfiles: profiles,
@@ -271,18 +272,12 @@ interface AppContextValue {
   state: AppState;
   setFixedCosts: (input: FixedCostInput) => void;
   setOperational: (input: OperationalInput) => void;
-  /** Alterna o tipo de veículo ativo (COMBUSTAO | ELETRICO) */
   setActiveVehicleType: (type: VehicleType) => void;
-  /** Salva ou atualiza o perfil de um tipo de veículo */
   saveVehicleProfileAction: (profile: VehicleProfile) => void;
-  /** Salva ou atualiza um registro diário (upsert por data) */
   addDailyRecord: (record: DailyRecord) => void;
-  /** Remove um registro diário por data */
   removeDailyRecord: (date: string) => void;
-  /** Adiciona uma transação ao histórico */
   addTransaction: (tx: Transaction) => void;
   setPeriodFilter: (filter: PeriodFilter) => void;
-  /** Helpers para criar transações automaticamente ao salvar dia */
   recordDayWithTransactions: (record: DailyRecord) => void;
 }
 
@@ -316,7 +311,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setFixedCosts = useCallback((input: FixedCostInput) => {
     dispatch({ type: "SET_FIXED_COSTS", input });
     saveFixedCosts(input);
-    // Registra ajuste de custo fixo no histórico de transações
     const fr = calculateFixedCosts(input);
     const tx = createAjusteTransaction(fr.custoMensalTotal, "Atualização de custos fixos");
     dispatch({ type: "ADD_TRANSACTION", transaction: tx });
@@ -357,9 +351,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_PERIOD_FILTER", filter });
   }, []);
 
-  /**
-   * Salva o dia E registra automaticamente as transações de GANHO e CUSTO.
-   */
   const recordDayWithTransactions = useCallback((record: DailyRecord) => {
     dispatch({ type: "ADD_DAILY_RECORD", record });
     saveDailyRecord(record);

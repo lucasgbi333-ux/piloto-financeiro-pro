@@ -18,6 +18,8 @@ export interface FixedCostResult {
   custoAnualTotal: number;
   custoDiarioNecessario: number;
   custoDiarioAnual: number;
+  /** Custo fixo diluído por dia = (mensal÷30) + (anual÷12÷30) */
+  custoFixoDiario: number;
 }
 
 // ===== PERFIS DE VEÍCULO =====
@@ -54,9 +56,13 @@ export interface OperationalInput {
 
 export interface OperationalResult {
   custoPorKm: number;
+  /** custoPorKm + custoFixoPorKm (fixos diluídos por km rodado) */
+  custoPorKmTotal: number;
   custoTotalDiaEstimado: number;
   custoTotalDiaReal: number;
   lucroPorKm: number;
+  /** Lucro já descontando custos fixos diluídos do dia */
+  lucroDiaLiquido: number;
   lucroDia: number;
   valorMinimoKm: number;
 }

@@ -44,3 +44,9 @@
 - [x] Remover aba Operacional
 - [x] Remover aba Histórico
 - [x] Atualizar navegação para 4 tabs (Dashboard, Fixos, Perfis, Relatórios)
+- [x] Calcular custoFixoDiario (mensal÷30 + anual÷12÷30) e custoPorKmTotal nos use-cases
+- [x] Criar aba Lançamentos com calendário mensal e botão + para lançar dia
+- [x] Remover campo de data da tela Perfis
+- [x] Atualizar Relatórios: remover histórico, adicionar lista de dias lançados
+- [x] Atualizar Dashboard: lucro líquido descontando custos fixos diluídos
+- [x] Atualizar navegação para 5 tabs (Dashboard, Lançamentos, Fixos, Perfis, Relatórios)

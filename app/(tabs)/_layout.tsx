@@ -1,8 +1,8 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 
 export default function TabLayout() {
@@ -15,7 +15,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#00D4AA",
-        tabBarInactiveTintColor: "#8E8E93",
+        tabBarInactiveTintColor: "#555555",
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
@@ -27,7 +27,7 @@ export default function TabLayout() {
           borderTopWidth: 0.5,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: "600",
         },
       }}
@@ -36,38 +36,36 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Dashboard",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="fixed-costs"
         options={{
           title: "Fixos",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="doc.text.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="creditcard.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="lancamentos"
+        options={{
+          title: "Lançamentos",
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="calendar.badge.plus" color={color} />,
         }}
       />
       <Tabs.Screen
         name="vehicle-profiles"
         options={{
-          title: "Perfis",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="car.fill" color={color} />,
+          title: "Garagem",
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="car.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="reports"
         options={{
           title: "Relatórios",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="chart.bar.fill" color={color} />,
         }}
-      />
-      {/* Abas ocultas — mantidas para não quebrar o roteamento, mas sem exibição na tab bar */}
-      <Tabs.Screen
-        name="operational"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{ href: null }}
       />
     </Tabs>
   );
