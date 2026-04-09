@@ -1,0 +1,26 @@
+# Project TODO
+
+- [x] Configurar tema OLED Black premium (theme.config.js)
+- [x] Configurar ícones de tab no icon-symbol.tsx
+- [x] Criar estrutura de 4 tabs (Dashboard, Custos Fixos, Operacional, Relatórios)
+- [x] Criar componente InputField reutilizável
+- [x] Criar componente ResultCard reutilizável
+- [x] Criar componente SegmentedControl reutilizável
+- [x] Implementar FixedCostRepository (AsyncStorage)
+- [x] Implementar FixedCostUseCase (lógica de cálculo)
+- [x] Implementar FixedCostViewModel (estado + ações)
+- [x] Implementar tela de Custos Fixos com formulário e resultados
+- [x] Implementar OperationalCostUseCase (lógica de cálculo)
+- [x] Implementar OperationalViewModel (estado + ações)
+- [x] Implementar tela de Custo Operacional com formulário e resultados
+- [x] Implementar ReportsRepository (AsyncStorage)
+- [x] Implementar GroupReportsUseCase (agrupamento por período)
+- [x] Implementar ReportsViewModel (estado + filtros)
+- [x] Implementar AnimatedBarChart (Canvas + animação única)
+- [x] Implementar tela de Relatórios com gráfico e lista
+- [x] Implementar DashboardViewModel (estado consolidado)
+- [x] Implementar tela Dashboard com 3 cards principais
+- [x] Persistência completa com AsyncStorage
+- [x] Integração entre módulos (dados fluem entre telas)
+- [x] Gerar logo do app
+- [x] Atualizar app.config.ts com branding
