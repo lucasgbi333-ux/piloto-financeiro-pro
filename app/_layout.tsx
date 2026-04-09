@@ -1,6 +1,6 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -27,6 +27,24 @@ const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+// Handles Stripe redirect params at the root level (for static web export)
+// When Stripe redirects to /?stripe_success=true, this component detects it
+// and redirects to /login?success=true so the login screen can handle it
+function StripeRedirectHandler() {
+  const params = useLocalSearchParams<{ stripe_success?: string; stripe_canceled?: string }>();
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (params.stripe_success === "true") {
+      router.replace({ pathname: "/login", params: { success: "true" } });
+    } else if (params.stripe_canceled === "true") {
+      router.replace({ pathname: "/login", params: { canceled: "true" } });
+    }
+  }, [params.stripe_success, params.stripe_canceled]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
@@ -86,6 +104,7 @@ export default function RootLayout() {
       <AppProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
+          <StripeRedirectHandler />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />

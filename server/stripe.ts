@@ -129,6 +129,11 @@ export function registerStripeRoutes(app: Express) {
       // Use the app's published domain if available, otherwise use the request origin
       const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://pilotofin-jwjxudxa.manus.space";
 
+      // For static Expo web apps, all routes are served from the root index.html
+      // We use the root path with query params so the app can detect and handle them
+      const successUrl = `${origin}/?stripe_success=true`;
+      const cancelUrl = `${origin}/?stripe_canceled=true`;
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: "subscription",
@@ -137,8 +142,8 @@ export function registerStripeRoutes(app: Express) {
         subscription_data: {
           trial_period_days: 7,
         },
-        success_url: `${origin}/login?success=true`,
-        cancel_url: `${origin}/login?canceled=true`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: { email },
       });
 
