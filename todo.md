@@ -117,3 +117,6 @@
 - [x] Webhook: adicionar evento customer.subscription.created (status trialing) para marcar ativo=true
 - [x] App: re-verificar status de assinatura após retorno do checkout (deep link)
 - [x] Paywall: botão "Já assinei — verificar novamente" que consulta Supabase e libera acesso
+- [x] Criar rota app/checkout-success.tsx para capturar deep link pilotofinanceiro://checkout-success
+- [x] Criar rota app/checkout-canceled.tsx para capturar deep link pilotofinanceiro://checkout-canceled
+- [x] Lógica na rota: verificar assinatura no Supabase e redirecionar para Dashboard
