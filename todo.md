@@ -131,3 +131,6 @@
 - [x] Implementar seção Customização do Pop-up com switches e sliders (fonte, transparência, duração)
 - [x] Registrar aba Radar de Ganhos no tab layout com ícone
 - [x] Criar tela Histórico de Chamadas
+- [x] Criar módulo de verificação de permissões SYSTEM_ALERT_WINDOW e Accessibility Service
+- [x] Adicionar banner de alerta na tela Radar de Ganhos quando permissões estiverem ausentes
+- [x] Botão "Conceder permissão" que abre as configurações corretas do Android via Linking

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Platform,
+  Alert,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -18,6 +19,16 @@ import {
   type SemaforoLimite,
 } from "@/lib/radar-ganhos-context";
 import * as Haptics from "expo-haptics";
+import { PermissionBanner } from "@/components/permission-banner";
+import {
+  isAndroid,
+  openOverlaySettings,
+  openAccessibilitySettings,
+  getOverlayPermissionGranted,
+  getAccessibilityPermissionGranted,
+  markOverlayPermissionGranted,
+  markAccessibilityPermissionGranted,
+} from "@/lib/overlay-permissions";
 
 // ─── Colors ───
 const C = {
@@ -288,6 +299,70 @@ export default function RadarGanhosScreen() {
     setOverlaySlider,
   } = useRadarGanhos();
 
+  // Estado de permissões (Android only)
+  const [overlayGranted, setOverlayGranted] = useState(false);
+  const [accessibilityGranted, setAccessibilityGranted] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  // Carrega o estado de permissões do AsyncStorage
+  useEffect(() => {
+    if (!isAndroid) {
+      setPermissionsLoaded(true);
+      return;
+    }
+    Promise.all([
+      getOverlayPermissionGranted(),
+      getAccessibilityPermissionGranted(),
+    ]).then(([overlay, accessibility]) => {
+      setOverlayGranted(overlay);
+      setAccessibilityGranted(accessibility);
+      setPermissionsLoaded(true);
+    });
+  }, []);
+
+  // Abre configurações de overlay e aguarda o usuário confirmar
+  async function handleGrantOverlay() {
+    await openOverlaySettings();
+    // Após abrir as configurações, mostra alerta pedindo confirmação
+    Alert.alert(
+      "Permissão concedida?",
+      "Após ativar 'Exibir sobre outros apps' nas configurações, toque em 'Sim' para confirmar.",
+      [
+        { text: "Ainda não", style: "cancel" },
+        {
+          text: "Sim, concedi",
+          onPress: async () => {
+            await markOverlayPermissionGranted(true);
+            setOverlayGranted(true);
+          },
+        },
+      ]
+    );
+  }
+
+  // Abre configurações de acessibilidade e aguarda o usuário confirmar
+  async function handleGrantAccessibility() {
+    await openAccessibilitySettings();
+    Alert.alert(
+      "Serviço ativado?",
+      "Após ativar o Piloto Financeiro Pro em Serviços de Acessibilidade, toque em 'Sim' para confirmar.",
+      [
+        { text: "Ainda não", style: "cancel" },
+        {
+          text: "Sim, ativei",
+          onPress: async () => {
+            await markAccessibilityPermissionGranted(true);
+            setAccessibilityGranted(true);
+          },
+        },
+      ]
+    );
+  }
+
+  // Determina se deve exibir os banners de permissão
+  const showOverlayBanner = isAndroid && permissionsLoaded && !overlayGranted;
+  const showAccessibilityBanner = isAndroid && permissionsLoaded && !accessibilityGranted;
+
   return (
     <ScreenContainer containerClassName="bg-black" className="bg-black">
       <ScrollView
@@ -303,6 +378,47 @@ export default function RadarGanhosScreen() {
         <Text style={styles.headerSubtitle}>
           Central de configurações do overlay para apps de corrida
         </Text>
+
+        {/* ═══ BANNERS DE PERMISSÃO (Android only) ═══ */}
+        {showOverlayBanner && (
+          <PermissionBanner
+            variant="warning"
+            icon="layers"
+            title="Permissão de sobreposição necessária"
+            description="Para exibir o pop-up sobre os apps de corrida (Uber, 99, InDrive), o app precisa da permissão 'Exibir sobre outros apps' do Android."
+            actionLabel="Abrir configurações"
+            onAction={handleGrantOverlay}
+            secondaryLabel="Já concedi"
+            onSecondary={async () => {
+              await markOverlayPermissionGranted(true);
+              setOverlayGranted(true);
+            }}
+          />
+        )}
+
+        {showAccessibilityBanner && (
+          <PermissionBanner
+            variant="warning"
+            icon="accessibility"
+            title="Serviço de Acessibilidade necessário"
+            description="Para capturar automaticamente os dados das ofertas de corrida (valor, distância, nota), o app precisa estar ativo em Serviços de Acessibilidade do Android."
+            actionLabel="Ativar acessibilidade"
+            onAction={handleGrantAccessibility}
+            secondaryLabel="Já ativei"
+            onSecondary={async () => {
+              await markAccessibilityPermissionGranted(true);
+              setAccessibilityGranted(true);
+            }}
+          />
+        )}
+
+        {/* Status de permissões quando ambas estão concedidas */}
+        {isAndroid && permissionsLoaded && overlayGranted && accessibilityGranted && (
+          <View style={styles.permissionOk}>
+            <MaterialIcons name="check-circle" size={18} color="#22C55E" />
+            <Text style={styles.permissionOkText}>Permissões configuradas — Overlay ativo</Text>
+          </View>
+        )}
 
         {/* ═══ SEÇÃO 1: Semáforo de Valores ═══ */}
         <SectionHeader
@@ -825,5 +941,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     minWidth: 28,
     textAlign: "center",
+  },
+
+  // Permission OK status
+  permissionOk: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#0A1F0A",
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "#22C55E44",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  permissionOkText: {
+    color: "#22C55E",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
