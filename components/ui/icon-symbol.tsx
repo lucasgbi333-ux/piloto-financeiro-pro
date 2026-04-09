@@ -7,17 +7,28 @@ type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof Materia
 type IconSymbolName = keyof typeof MAPPING;
 
 const MAPPING = {
+  // Navegação principal
   "house.fill": "home",
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
-  "doc.text.fill": "description",
+  // Tabs modernas
+  "doc.text.fill": "receipt-long",
   "car.fill": "directions-car",
-  "chart.bar.fill": "bar-chart",
+  "chart.bar.fill": "insights",
   "person.fill": "person",
-  "list.bullet": "list",
-  "creditcard.fill": "credit-card",
-  "calendar.badge.plus": "event",
+  "list.bullet": "format-list-bulleted",
+  "creditcard.fill": "account-balance-wallet",
+  "calendar.badge.plus": "add-circle",
+  "clock.fill": "history",
+  "chart.line.uptrend.xyaxis": "trending-up",
+  "bolt.fill": "flash-on",
+  "fuelpump.fill": "local-gas-station",
+  "speedometer": "speed",
+  "wallet.pass.fill": "payments",
+  "square.grid.2x2.fill": "dashboard",
+  "calendar": "calendar-today",
+  "clock.arrow.circlepath": "history",
 } as IconMapping;
 
 export function IconSymbol({

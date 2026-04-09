@@ -163,7 +163,11 @@ function getMonthKey(dateStr: string): string {
   return `${months[d.getMonth()]}/${d.getFullYear()}`;
 }
 
-export function groupReports(records: DailyRecord[], filter: PeriodFilter): ReportItem[] {
+export function groupReports(
+  records: DailyRecord[],
+  filter: PeriodFilter,
+  custoFixoDiario = 0
+): ReportItem[] {
   if (records.length === 0) return [];
 
   const sorted = [...records].sort(
@@ -174,26 +178,38 @@ export function groupReports(records: DailyRecord[], filter: PeriodFilter): Repo
     return sorted.map((r) => ({
       period: r.date,
       totalProfit: r.ganho - r.custo,
+      totalLiquid: r.ganho - r.custo - custoFixoDiario,
       totalKm: r.kmRodado,
       totalCost: r.custo,
+      totalGanho: r.ganho,
+      count: 1,
     }));
   }
 
-  const groups = new Map<string, { profit: number; km: number; cost: number }>();
+  const groups = new Map<string, { profit: number; liquid: number; km: number; cost: number; ganho: number; count: number }>();
 
   for (const r of sorted) {
-    const key = filter === "WEEK" ? getWeekKey(r.date) : getMonthKey(r.date);
-    const existing = groups.get(key) || { profit: 0, km: 0, cost: 0 };
+    let key: string;
+    if (filter === "WEEK") key = getWeekKey(r.date);
+    else if (filter === "MONTH") key = getMonthKey(r.date);
+    else key = String(new Date(r.date + "T12:00:00").getFullYear());
+    const existing = groups.get(key) || { profit: 0, liquid: 0, km: 0, cost: 0, ganho: 0, count: 0 };
     existing.profit += r.ganho - r.custo;
+    existing.liquid += r.ganho - r.custo - custoFixoDiario;
     existing.km += r.kmRodado;
     existing.cost += r.custo;
+    existing.ganho += r.ganho;
+    existing.count += 1;
     groups.set(key, existing);
   }
 
   return Array.from(groups.entries()).map(([period, data]) => ({
     period,
     totalProfit: data.profit,
+    totalLiquid: data.liquid,
     totalKm: data.km,
     totalCost: data.cost,
+    totalGanho: data.ganho,
+    count: data.count,
   }));
 }

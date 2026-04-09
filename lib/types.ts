@@ -95,13 +95,17 @@ export interface Transaction {
 }
 
 // ===== RELATÓRIOS =====
-export type PeriodFilter = "DAY" | "WEEK" | "MONTH";
+export type PeriodFilter = "DAY" | "WEEK" | "MONTH" | "YEAR";
 
 export interface ReportItem {
   period: string;
   totalProfit: number;
+  /** Lucro já descontando custos fixos diluídos */
+  totalLiquid?: number;
   totalKm: number;
   totalCost: number;
+  totalGanho?: number;
+  count?: number;
 }
 
 // ===== DASHBOARD =====

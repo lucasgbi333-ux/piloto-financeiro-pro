@@ -50,3 +50,11 @@
 - [x] Atualizar Relatórios: remover histórico, adicionar lista de dias lançados
 - [x] Atualizar Dashboard: lucro líquido descontando custos fixos diluídos
 - [x] Atualizar navegação para 5 tabs (Dashboard, Lançamentos, Fixos, Perfis, Relatórios)
+- [x] Remover aba Garagem (informações repetidas)
+- [x] Remover aba Relatórios
+- [x] Criar aba Histórico com gráfico dinâmico de barras e filtros dia/semana/mês/ano
+- [x] Atualizar ícones das tabs para versões modernas
+- [x] Adicionar edição e exclusão em Custos Fixos
+- [x] Adicionar edição e exclusão em Lançamentos (já tem, melhorar)
+- [x] Sincronizar exclusão de lançamento com Dashboard
+- [x] Atualizar navegação para 4 tabs (Dashboard, Fixos, Lançamentos, Histórico)

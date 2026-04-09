@@ -1,10 +1,13 @@
-import { ScrollView, Text, View, StyleSheet } from "react-native";
+import {
+  Text, View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform,
+} from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { InputField } from "@/components/ui/input-field";
 import { ResultCard } from "@/components/ui/result-card";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useApp } from "@/lib/app-context";
 import type { FixedCostInput, RentalType, InsuranceType } from "@/lib/types";
+import * as Haptics from "expo-haptics";
 
 function fmt(val: number): string {
   return `R$ ${val.toFixed(2).replace(".", ",")}`;
@@ -17,6 +20,30 @@ export default function FixedCostsScreen() {
 
   const update = (partial: Partial<FixedCostInput>) => {
     setFixedCosts({ ...input, ...partial });
+  };
+
+  const handleReset = () => {
+    const doReset = () => {
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setFixedCosts({
+        ipvaAnual: 0,
+        financiamentoMensal: 0,
+        aluguelValor: 0,
+        tipoAluguel: "MENSAL" as RentalType,
+        internetMensal: 0,
+        outrosCustos: 0,
+        seguroValor: 0,
+        tipoSeguro: "MENSAL" as InsuranceType,
+      });
+    };
+    if (Platform.OS === "web") {
+      if (window.confirm("Limpar todos os custos fixos?")) doReset();
+    } else {
+      Alert.alert("Limpar Custos Fixos", "Deseja zerar todos os valores?", [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Limpar", style: "destructive", onPress: doReset },
+      ]);
+    }
   };
 
   const rentalOptions: RentalType[] = ["SEMANAL", "MENSAL"];
@@ -32,7 +59,12 @@ export default function FixedCostsScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Custos Fixos</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Custos Fixos</Text>
+          <TouchableOpacity style={styles.resetBtn} onPress={handleReset} activeOpacity={0.7}>
+            <Text style={styles.resetBtnText}>Limpar</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subtitle}>
           Configure seus custos fixos para calcular quanto precisa gerar por dia.
         </Text>
@@ -169,13 +201,19 @@ export default function FixedCostsScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   title: {
     color: "#FFFFFF",
     fontSize: 32,
     fontWeight: "700",
     letterSpacing: -0.5,
-    marginBottom: 8,
   },
+  resetBtn: {
+    backgroundColor: "#FF453A22", borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: "#FF453A44",
+  },
+  resetBtnText: { color: "#FF453A", fontSize: 13, fontWeight: "600" },
   subtitle: {
     color: "#8E8E93",
     fontSize: 15,

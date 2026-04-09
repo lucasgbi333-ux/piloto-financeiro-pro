@@ -22,13 +22,14 @@ export default function TabLayout() {
           paddingTop: 8,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
-          backgroundColor: "#000000",
+          backgroundColor: "#0A0A0A",
           borderTopColor: "#1C1C1E",
           borderTopWidth: 0.5,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: "600",
+          letterSpacing: 0.2,
         },
       }}
     >
@@ -36,37 +37,44 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Dashboard",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="square.grid.2x2.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="fixed-costs"
         options={{
           title: "Fixos",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="creditcard.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="creditcard.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="lancamentos"
         options={{
           title: "Lançamentos",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="calendar.badge.plus" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="calendar.badge.plus" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="vehicle-profiles"
+        name="historico"
         options={{
-          title: "Garagem",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="car.fill" color={color} />,
+          title: "Histórico",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="chart.line.uptrend.xyaxis" color={color} />
+          ),
         }}
       />
-      <Tabs.Screen
-        name="reports"
-        options={{
-          title: "Relatórios",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="chart.bar.fill" color={color} />,
-        }}
-      />
+
+      {/* Telas ocultas da tab bar */}
+      <Tabs.Screen name="vehicle-profiles" options={{ href: null }} />
+      <Tabs.Screen name="reports" options={{ href: null }} />
+      <Tabs.Screen name="operational" options={{ href: null }} />
+      <Tabs.Screen name="history" options={{ href: null }} />
     </Tabs>
   );
 }

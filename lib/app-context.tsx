@@ -168,7 +168,7 @@ function reducer(state: AppState, action: Action): AppState {
         activeProfile,
         dailyRecords: recs,
         transactions: action.transactions,
-        reports: groupReports(recs, state.periodFilter),
+        reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
         dashboard: computeDashboard(fr, or2),
         loaded: true,
       };
@@ -238,7 +238,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         dailyRecords: recs,
-        reports: groupReports(recs, state.periodFilter),
+        reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
       };
     }
     case "DELETE_DAILY_RECORD": {
@@ -246,7 +246,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         dailyRecords: recs,
-        reports: groupReports(recs, state.periodFilter),
+        reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
       };
     }
     case "ADD_TRANSACTION": {
@@ -259,7 +259,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         periodFilter: action.filter,
-        reports: groupReports(state.dailyRecords, action.filter),
+        reports: groupReports(state.dailyRecords, action.filter, state.fixedCostResult.custoFixoDiario),
       };
     }
     default:
