@@ -4,6 +4,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { useApp } from "@/lib/app-context";
 import { InputField } from "@/components/ui/input-field";
+import { ResultCard } from "@/components/ui/result-card";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import * as Haptics from "expo-haptics";
 import { useState, useMemo } from "react";
@@ -18,6 +19,9 @@ const MONTHS = [
 
 function fmt(val: number): string {
   return `R$ ${val.toFixed(2).replace(".", ",")}`;
+}
+function fmtKm(val: number): string {
+  return `R$ ${val.toFixed(3).replace(".", ",")}/km`;
 }
 
 function todayStr(): string {
@@ -48,7 +52,6 @@ export default function LancamentosScreen() {
   const [ganho, setGanho] = useState(0);
   const [margemDesejada, setMargemDesejada] = useState(state.operationalInput.margemDesejadaPorKm);
   const [gastoAbastecimento, setGastoAbastecimento] = useState(0);
-  const [valorMinimoKm, setValorMinimoKm] = useState(state.operationalInput.margemDesejadaPorKm);
 
   // Modal de detalhe do dia
   const [detailDate, setDetailDate] = useState<string | null>(null);
@@ -102,19 +105,28 @@ export default function LancamentosScreen() {
       setGanho(op.ganhoDia > 0 ? op.ganhoDia : 0);
       setMargemDesejada(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
       setGastoAbastecimento(op.gastoAbastecimento > 0 ? op.gastoAbastecimento : 0);
-      setValorMinimoKm(op.margemDesejadaPorKm > 0 ? op.margemDesejadaPorKm : activeProfile.margemDesejada);
     }
     setModalVisible(true);
   };
 
-  // Cálculo em tempo real no modal
+  // Cálculo em tempo real no modal — idêntico ao Operacional
   const modalResult = useMemo(() => {
     return calculateOperationalCost(
-      { tipoVeiculo, precoCombustivel, autonomia, kmRodadoDia: kmRodado, ganhoDia: ganho, margemDesejadaPorKm: margemDesejada, gastoAbastecimento },
+      {
+        tipoVeiculo,
+        precoCombustivel,
+        autonomia,
+        kmRodadoDia: kmRodado,
+        ganhoDia: ganho,
+        margemDesejadaPorKm: margemDesejada,
+        gastoAbastecimento,
+      },
       undefined,
       fixedCostResult.custoFixoDiario
     );
   }, [tipoVeiculo, precoCombustivel, autonomia, kmRodado, ganho, margemDesejada, gastoAbastecimento, fixedCostResult.custoFixoDiario]);
+
+  const usingRealCost = modalResult.isUsingRealCost;
 
   const handleSave = () => {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -143,7 +155,6 @@ export default function LancamentosScreen() {
 
   const detailRecord = detailDate ? recordMap.get(detailDate) : null;
   const todayDateStr = todayStr();
-  const usingRealCost = gastoAbastecimento > 0;
 
   return (
     <ScreenContainer>
@@ -245,7 +256,7 @@ export default function LancamentosScreen() {
                   </View>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
-                      <Text style={styles.summaryLabel}>Custo Combustível</Text>
+                      <Text style={styles.summaryLabel}>{state.activeVehicleType === "ELETRICO" ? "Recarga Elét." : "Combustível"}</Text>
                       <Text style={[styles.summaryValue, { color: "#FF453A" }]}>{fmt(totalCusto)}</Text>
                     </View>
                     <View style={styles.summaryCard}>
@@ -267,7 +278,7 @@ export default function LancamentosScreen() {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* Modal de lançamento — todos os campos do Operacional */}
+      {/* ===== MODAL DE LANÇAMENTO — PARIDADE TOTAL COM ABA OPERACIONAL ===== */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <ScrollView
@@ -279,6 +290,9 @@ export default function LancamentosScreen() {
             <View style={styles.modalSheet}>
               <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>Lançar Dia</Text>
+              <Text style={styles.modalSubtitle}>
+                Calcule o custo por KM e o lucro real. Os dados do perfil ativo são carregados automaticamente.
+              </Text>
 
               {/* Data */}
               <Text style={styles.sectionLabel}>Data</Text>
@@ -304,24 +318,33 @@ export default function LancamentosScreen() {
               />
               <View style={styles.sectionSpacer} />
 
-              {/* Energia */}
+              {/* Badge do perfil ativo */}
+              {(activeProfile.precoEnergia > 0 || activeProfile.autonomia > 0) && (
+                <View style={styles.profileBadge}>
+                  <Text style={styles.profileBadgeText}>
+                    {tipoVeiculo === "COMBUSTAO" ? "⛽" : "🔋"} Perfil ativo: R$ {activeProfile.precoEnergia.toFixed(2).replace(".", ",")} · {activeProfile.autonomia} {tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
+                  </Text>
+                </View>
+              )}
+
+              {/* Configuração de Energia */}
               <Text style={styles.sectionLabel}>Configuração de Energia</Text>
               <InputField
-                label={tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (R$/L)" : "Preço kWh (R$)"}
+                label={tipoVeiculo === "COMBUSTAO" ? "Preço do Combustível (L)" : "Preço kWh"}
                 value={precoCombustivel}
                 onChangeValue={setPrecoCombustivel}
-                placeholder="0,00"
+                placeholder={activeProfile.precoEnergia > 0 ? activeProfile.precoEnergia.toFixed(2) : "0,00"}
                 suffix="R$"
               />
               <InputField
                 label={tipoVeiculo === "COMBUSTAO" ? "Autonomia (km/L)" : "Autonomia (km/kWh)"}
                 value={autonomia}
                 onChangeValue={setAutonomia}
-                placeholder="0"
+                placeholder={activeProfile.autonomia > 0 ? String(activeProfile.autonomia) : "0"}
                 suffix={tipoVeiculo === "COMBUSTAO" ? "km/L" : "km/kWh"}
               />
 
-              {/* Dados do dia */}
+              {/* Dados do Dia */}
               <Text style={styles.sectionLabel}>Dados do Dia</Text>
               <InputField
                 label="KM Rodados"
@@ -341,18 +364,11 @@ export default function LancamentosScreen() {
                 label="Margem Desejada por KM"
                 value={margemDesejada}
                 onChangeValue={setMargemDesejada}
-                placeholder="0,00"
-                suffix="R$/km"
-              />
-              <InputField
-                label="Valor Mínimo por KM"
-                value={valorMinimoKm}
-                onChangeValue={setValorMinimoKm}
-                placeholder="0,00"
+                placeholder={activeProfile.margemDesejada > 0 ? activeProfile.margemDesejada.toFixed(2) : "0,00"}
                 suffix="R$/km"
               />
 
-              {/* Abastecimento */}
+              {/* Abastecimento / Recarga */}
               <View style={styles.fuelSection}>
                 <Text style={styles.fuelTitle}>
                   {tipoVeiculo === "COMBUSTAO" ? "⛽ Abastecimento de Hoje" : "🔋 Recarga de Hoje"}
@@ -371,62 +387,77 @@ export default function LancamentosScreen() {
                 />
                 {usingRealCost ? (
                   <View style={styles.fuelNoteReal}>
-                    <Text style={styles.fuelNoteRealText}>✓ Usando custo real: {fmt(gastoAbastecimento)}</Text>
+                    <Text style={styles.fuelNoteRealText}>
+                      ✓ Usando custo real baseado no seu {tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga elétrica"}
+                    </Text>
                   </View>
                 ) : (
                   <View style={styles.fuelNoteEstimated}>
-                    <Text style={styles.fuelNoteEstimatedText}>ℹ Custo estimado: {fmt(modalResult.custoTotalDiaEstimado)}</Text>
+                    <Text style={styles.fuelNoteEstimatedText}>
+                      ℹ Usando estimativa — adicione {tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga"} para maior precisão
+                    </Text>
                   </View>
                 )}
               </View>
 
-              {/* Preview dos resultados */}
-              {(kmRodado > 0 || ganho > 0) && (
-                <View style={styles.previewCard}>
-                  <Text style={styles.previewTitle}>Preview do Lançamento</Text>
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Custo/km</Text>
-                    <Text style={styles.previewValue}>
-                      R$ {modalResult.custoPorKm.toFixed(3).replace(".", ",")}
-                    </Text>
-                  </View>
-                  {valorMinimoKm > 0 && (
-                    <View style={styles.previewRow}>
-                      <Text style={styles.previewLabel}>Mínimo por KM</Text>
-                      <Text style={[styles.previewValue, { color: "#00D4AA" }]}>
-                        R$ {valorMinimoKm.toFixed(3).replace(".", ",")}/km
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Custo do Dia</Text>
-                    <Text style={[styles.previewValue, { color: "#FF453A" }]}>
-                      {fmt(usingRealCost ? gastoAbastecimento : modalResult.custoTotalDiaEstimado)}
-                    </Text>
-                  </View>
-                  <View style={styles.previewRow}>
-                    <Text style={styles.previewLabel}>Custo Fixo Diário</Text>
-                    <Text style={[styles.previewValue, { color: "#FF9500" }]}>
-                      {fmt(fixedCostResult.custoFixoDiario)}
-                    </Text>
-                  </View>
-                  <View style={[styles.previewRow, styles.previewRowTotal]}>
-                    <Text style={styles.previewLabelBold}>Lucro Líquido</Text>
-                    <Text style={[styles.previewValueBold, {
-                      color: modalResult.lucroDia >= 0 ? "#30D158" : "#FF453A"
-                    }]}>
-                      {fmt(modalResult.lucroDia)}
-                    </Text>
-                  </View>
-                </View>
-              )}
+              {/* ===== RESULTADOS — idênticos ao Operacional ===== */}
+              <Text style={styles.resultsTitle}>Resultados</Text>
+
+              {/* Custo por KM */}
+              <ResultCard
+                icon="speed"
+                title={usingRealCost ? "Custo por KM (Real)" : "Custo por KM (Estimado)"}
+                value={fmtKm(modalResult.custoPorKm)}
+                subtitle={
+                  usingRealCost
+                    ? `Baseado no gasto real: ${fmt(gastoAbastecimento)}`
+                    : `Adicione ${tipoVeiculo === "COMBUSTAO" ? "abastecimento" : "recarga"} para custo real`
+                }
+                accentColor={usingRealCost ? "#00D4AA" : "#FF9500"}
+              />
+
+              {/* Custo do Dia */}
+              <ResultCard
+                icon="local-gas-station"
+                title={usingRealCost ? "Custo Real do Dia" : "Custo Estimado do Dia"}
+                value={fmt(modalResult.custoTotalDiaReal)}
+                subtitle={usingRealCost ? `Gasto real: ${fmt(gastoAbastecimento)}` : `Estimado: ${fmt(modalResult.custoTotalDiaEstimado)}`}
+                accentColor={usingRealCost ? "#FF453A" : "#FF9500"}
+              />
+
+              {/* Lucro por KM */}
+              <ResultCard
+                icon="trending-up"
+                title="Lucro por KM"
+                value={fmtKm(modalResult.lucroPorKm)}
+                subtitle={`Calculado com custo ${usingRealCost ? "real" : "estimado"}`}
+                accentColor={modalResult.lucroPorKm >= 0 ? "#30D158" : "#FF453A"}
+              />
+
+              {/* Lucro Líquido do Dia */}
+              <ResultCard
+                icon="account-balance-wallet"
+                title="Lucro Líquido do Dia"
+                value={fmt(modalResult.lucroDiaLiquido)}
+                subtitle={`Ganho ${fmt(ganho)} − Custo ${fmt(modalResult.custoTotalDiaReal)} − Fixos ${fmt(fixedCostResult.custoFixoDiario)}`}
+                accentColor={modalResult.lucroDiaLiquido >= 0 ? "#30D158" : "#FF453A"}
+              />
+
+              {/* Valor Mínimo por KM */}
+              <ResultCard
+                icon="verified"
+                title="Valor Mínimo por KM"
+                value={fmtKm(modalResult.valorMinimoKm)}
+                subtitle="Aceite corridas acima deste valor"
+                accentColor="#00D4AA"
+              />
 
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} activeOpacity={0.8}>
                   <Text style={styles.cancelBtnText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-                  <Text style={styles.saveBtnText}>Salvar</Text>
+                  <Text style={styles.saveBtnText}>Salvar Dia</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -472,13 +503,12 @@ export default function LancamentosScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.editBtn} onPress={() => {
                     setDetailDate(null);
-                    openModal();
-                    // Abre o modal com os dados do registro
                     setTimeout(() => {
                       setSelectedDate(detailRecord.date);
                       setKmRodado(detailRecord.kmRodado);
                       setGanho(detailRecord.ganho);
                       setGastoAbastecimento(detailRecord.custo);
+                      setModalVisible(true);
                     }, 50);
                   }} activeOpacity={0.8}>
                     <Text style={styles.editBtnText}>Editar</Text>
@@ -558,7 +588,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "flex-end",
   },
-  modalScroll: { maxHeight: "92%" },
+  modalScroll: { maxHeight: "95%" },
   modalScrollContent: { justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: "#111111", borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -572,12 +602,19 @@ const styles = StyleSheet.create({
     width: 40, height: 4, backgroundColor: "#333333",
     borderRadius: 2, alignSelf: "center", marginBottom: 20,
   },
-  modalTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "700", marginBottom: 16 },
+  modalTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "700", marginBottom: 6 },
+  modalSubtitle: { color: "#8E8E93", fontSize: 14, lineHeight: 20, marginBottom: 20 },
   sectionLabel: {
     color: "#8E8E93", fontSize: 12, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4,
   },
   sectionSpacer: { height: 12 },
+  profileBadge: {
+    backgroundColor: "rgba(10, 132, 255, 0.1)", borderRadius: 10,
+    padding: 10, marginBottom: 16, borderWidth: 1,
+    borderColor: "rgba(10, 132, 255, 0.3)",
+  },
+  profileBadgeText: { color: "#0A84FF", fontSize: 13, fontWeight: "500" },
   dateInputRow: {
     backgroundColor: "#000000", borderRadius: 12, borderWidth: 1,
     borderColor: "#2C2C2E", paddingHorizontal: 16, height: 50,
@@ -594,20 +631,10 @@ const styles = StyleSheet.create({
   fuelNoteRealText: { color: "#00D4AA", fontSize: 12, fontWeight: "500" },
   fuelNoteEstimated: { backgroundColor: "rgba(255,149,0,0.1)", borderRadius: 8, padding: 8, marginTop: -4 },
   fuelNoteEstimatedText: { color: "#FF9500", fontSize: 12, fontWeight: "500" },
-  previewCard: {
-    backgroundColor: "#0A0A0A", borderRadius: 14, padding: 14,
-    marginBottom: 12, borderWidth: 1, borderColor: "#2C2C2E",
+  resultsTitle: {
+    color: "#FFFFFF", fontSize: 18, fontWeight: "700",
+    marginTop: 8, marginBottom: 12,
   },
-  previewTitle: { color: "#8E8E93", fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
-  previewRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#1C1C1E",
-  },
-  previewRowTotal: { borderBottomWidth: 0, marginTop: 4 },
-  previewLabel: { color: "#8E8E93", fontSize: 13 },
-  previewValue: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
-  previewLabelBold: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
-  previewValueBold: { fontSize: 18, fontWeight: "800" },
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 16 },
   cancelBtn: {
     flex: 1, backgroundColor: "#1C1C1E", borderRadius: 12,

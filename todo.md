@@ -80,3 +80,4 @@
 - [x] Corrigir Dashboard: caixinha usando % configurável (não hardcoded 10%)
 - [x] Corrigir rótulos dinâmicos: Combustível vs Recarga Elétrica em todas as telas
 - [x] Adicionar 4 testes unitários específicos para modo Elétrico (18 testes total)
+- [x] Modal de Lançamentos: replicar todas as informações e descrições da aba Operacional (paridade total)
