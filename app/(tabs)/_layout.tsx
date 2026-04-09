@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, ActivityIndicator, View } from "react-native";
+import { Platform, ActivityIndicator, View, Text } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -13,23 +13,32 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
-  const { session, loading } = useSupabaseAuth();
+  const { session, loading, subscription, subscriptionLoading } = useSupabaseAuth();
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !session) {
       router.replace("/login");
     }
   }, [loading, session]);
 
-  if (loading) {
+  // Redirect to login/paywall if not subscribed
+  useEffect(() => {
+    if (!loading && session && !subscriptionLoading && !subscription.ativo) {
+      router.replace("/login");
+    }
+  }, [loading, session, subscriptionLoading, subscription.ativo]);
+
+  if (loading || subscriptionLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0A0A0A" }}>
         <ActivityIndicator size="large" color="#00D4AA" />
+        <Text style={{ color: "#8E8E93", fontSize: 14, marginTop: 12 }}>Verificando acesso...</Text>
       </View>
     );
   }
 
-  if (!session) {
+  if (!session || !subscription.ativo) {
     return null;
   }
 

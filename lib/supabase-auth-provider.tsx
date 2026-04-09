@@ -1,15 +1,26 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
+import { getApiBaseUrl } from "@/constants/oauth";
 import type { Session, User } from "@supabase/supabase-js";
+
+interface SubscriptionStatus {
+  ativo: boolean;
+  plano: string | null;
+}
 
 interface SupabaseAuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  subscription: SubscriptionStatus;
+  subscriptionLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  checkSubscription: () => Promise<void>;
+  createCheckout: () => Promise<{ url: string | null; error: string | null }>;
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextValue | null>(null);
@@ -17,6 +28,8 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextValue | null>(null)
 export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState<SubscriptionStatus>({ ativo: false, plano: null });
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,12 +37,78 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => authSub.unsubscribe();
   }, []);
+
+  // Check subscription status when session changes
+  const checkSubscription = useCallback(async () => {
+    const email = session?.user?.email;
+    if (!email) {
+      setSubscription({ ativo: false, plano: null });
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    try {
+      const apiBase = getApiBaseUrl();
+      const res = await fetch(
+        `${apiBase}/api/stripe/subscription-status?email=${encodeURIComponent(email)}`,
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSubscription({ ativo: data.ativo ?? false, plano: data.plano ?? null });
+      } else {
+        console.warn("[Auth] Failed to check subscription:", res.status);
+        setSubscription({ ativo: false, plano: null });
+      }
+    } catch (err) {
+      console.error("[Auth] Subscription check error:", err);
+      setSubscription({ ativo: false, plano: null });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }, [session?.user?.email]);
+
+  // Auto-check subscription when session changes
+  useEffect(() => {
+    if (session?.user?.email) {
+      checkSubscription();
+    } else {
+      setSubscription({ ativo: false, plano: null });
+    }
+  }, [session?.user?.email, checkSubscription]);
+
+  // Create Stripe checkout session
+  const createCheckout = useCallback(async (): Promise<{ url: string | null; error: string | null }> => {
+    const email = session?.user?.email;
+    if (!email) return { url: null, error: "Faça login primeiro" };
+
+    try {
+      const apiBase = getApiBaseUrl();
+      const res = await fetch(`${apiBase}/api/stripe/create-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { url: null, error: data.error || "Erro ao criar sessão de pagamento" };
+      }
+
+      const data = await res.json();
+      return { url: data.url, error: null };
+    } catch (err) {
+      console.error("[Auth] Checkout error:", err);
+      return { url: null, error: "Erro de conexão. Verifique sua internet." };
+    }
+  }, [session?.user?.email]);
 
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -112,8 +191,13 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("[Auth] signOut error:", err);
+    }
     setSession(null);
+    setSubscription({ ativo: false, plano: null });
   };
 
   return (
@@ -122,10 +206,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
+        subscription,
+        subscriptionLoading,
         signIn,
         signUp,
         resetPassword,
         signOut,
+        checkSubscription,
+        createCheckout,
       }}
     >
       {children}

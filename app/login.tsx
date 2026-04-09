@@ -1,17 +1,20 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Text, View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, Linking,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
 import * as Haptics from "expo-haptics";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 type Mode = "login" | "signup" | "reset";
 
 export default function LoginScreen() {
-  const { signIn, signUp, resetPassword } = useSupabaseAuth();
+  const { signIn, signUp, resetPassword, signOut, session, subscription, subscriptionLoading, createCheckout, checkSubscription } = useSupabaseAuth();
+  const params = useLocalSearchParams<{ success?: string; canceled?: string }>();
+
   const [mode, setMode] = useState<Mode>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,10 +22,31 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+
+  // Handle Stripe redirect params
+  useEffect(() => {
+    if (params.success === "true") {
+      setSuccessMsg("Pagamento aprovado! Faça login para acessar o app.");
+      setMode("login");
+      // Refresh subscription status
+      checkSubscription();
+    } else if (params.canceled === "true") {
+      setErrorMsg("Pagamento não concluído. Você pode tentar novamente.");
+    }
+  }, [params.success, params.canceled]);
+
+  // If user is logged in and subscribed, go to app
+  useEffect(() => {
+    if (session && subscription.ativo && !subscriptionLoading) {
+      router.replace("/(tabs)");
+    }
+  }, [session, subscription.ativo, subscriptionLoading]);
 
   const isValid = (() => {
     if (mode === "reset") return email.trim().length > 0;
@@ -40,6 +64,7 @@ export default function LoginScreen() {
   const handleSubmit = async () => {
     if (!isValid) return;
     setErrorMsg("");
+    setSuccessMsg("");
     setLoading(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -51,7 +76,9 @@ export default function LoginScreen() {
           hapticError();
         } else {
           hapticSuccess();
-          router.replace("/(tabs)");
+          // After login, subscription check will auto-trigger via useEffect
+          // If subscribed → redirect to tabs
+          // If not subscribed → show paywall (handled by the logged-in state below)
         }
 
       } else if (mode === "signup") {
@@ -62,14 +89,13 @@ export default function LoginScreen() {
         } else if (needsConfirmation) {
           hapticSuccess();
           Alert.alert(
-            "Conta criada! ✉️",
+            "Conta criada!",
             "Enviamos um email de confirmação. Verifique sua caixa de entrada e clique no link para ativar sua conta.",
             [{ text: "OK", onPress: () => switchMode("login") }]
           );
         } else {
-          // Sessão criada automaticamente (email confirmation desabilitado)
           hapticSuccess();
-          router.replace("/(tabs)");
+          // Session created, subscription check will auto-trigger
         }
 
       } else if (mode === "reset") {
@@ -80,7 +106,7 @@ export default function LoginScreen() {
         } else {
           hapticSuccess();
           Alert.alert(
-            "Email enviado! ✉️",
+            "Email enviado!",
             "Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.",
             [{ text: "OK", onPress: () => switchMode("login") }]
           );
@@ -94,13 +120,151 @@ export default function LoginScreen() {
     }
   };
 
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    setErrorMsg("");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      const { url, error } = await createCheckout();
+      if (error) {
+        setErrorMsg(error);
+        hapticError();
+      } else if (url) {
+        if (Platform.OS === "web") {
+          window.location.href = url;
+        } else {
+          await Linking.openURL(url);
+        }
+      }
+    } catch {
+      setErrorMsg("Erro ao iniciar pagamento. Tente novamente.");
+      hapticError();
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+
+
   const switchMode = (newMode: Mode) => {
     setMode(newMode);
     setErrorMsg("");
+    setSuccessMsg("");
     setPassword("");
     setFullName("");
   };
 
+  const handlePaywallLogout = async () => {
+    await signOut();
+    router.replace("/login");
+  };
+
+  // ─── PAYWALL: User is logged in but NOT subscribed ───
+  if (session && !subscription.ativo && !subscriptionLoading) {
+    const userName = session.user?.user_metadata?.full_name || session.user?.email?.split("@")[0] || "Motorista";
+
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} containerClassName="bg-background">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.logo}>Piloto Financeiro <Text style={styles.logoPro}>Pro</Text></Text>
+            <Text style={styles.title}>Assinatura Necessária</Text>
+            <Text style={styles.subtitle}>Olá, {userName}!</Text>
+          </View>
+
+          {/* Plan Card */}
+          <View style={styles.planCard}>
+            <View style={styles.planHeader}>
+              <MaterialIcons name="workspace-premium" size={32} color="#FFD700" />
+              <Text style={styles.planTitle}>Plano Mensal</Text>
+            </View>
+
+            <Text style={styles.planPrice}>
+              R$ 6,99<Text style={styles.planPeriod}>/mês</Text>
+            </Text>
+
+            <View style={styles.planFeatures}>
+              <PlanFeature text="Dashboard completo com métricas" />
+              <PlanFeature text="Lançamentos diários ilimitados" />
+              <PlanFeature text="Histórico e relatórios detalhados" />
+              <PlanFeature text="Perfis Combustão e Elétrico" />
+              <PlanFeature text="Caixinha de manutenção e reserva" />
+              <PlanFeature text="Custos fixos e cálculo de lucro" />
+            </View>
+
+            {/* Subscribe Button */}
+            <TouchableOpacity
+              style={styles.subscribeBtn}
+              onPress={handleCheckout}
+              activeOpacity={0.8}
+              disabled={checkoutLoading}
+            >
+              {checkoutLoading ? (
+                <ActivityIndicator color="#0A0A0A" size="small" />
+              ) : (
+                <>
+                  <MaterialIcons name="lock-open" size={20} color="#0A0A0A" />
+                  <Text style={styles.subscribeBtnText}>Assinar Plano Mensal</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Refresh subscription status */}
+            <TouchableOpacity
+              style={styles.refreshBtn}
+              onPress={async () => {
+                setCheckoutLoading(true);
+                await checkSubscription();
+                setCheckoutLoading(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.refreshBtnText}>Já assinei — verificar novamente</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Error message */}
+          {errorMsg ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          {/* Logout link */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              onPress={handlePaywallLogout}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.linkText}>
+                Sair da conta — <Text style={styles.linkTextAccent}>Trocar conta</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </ScreenContainer>
+    );
+  }
+
+  // ─── Loading subscription check ───
+  if (session && subscriptionLoading) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} containerClassName="bg-background">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00D4AA" />
+          <Text style={styles.loadingText}>Verificando assinatura...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  // ─── LOGIN / SIGNUP / RESET FORM ───
   const title = mode === "login" ? "Entrar" : mode === "signup" ? "Criar Conta" : "Recuperar Senha";
   const subtitle = mode === "login"
     ? "Acesse sua conta para continuar"
@@ -128,9 +292,16 @@ export default function LoginScreen() {
             <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
 
+          {/* Success message from Stripe */}
+          {successMsg ? (
+            <View style={styles.successBox}>
+              <MaterialIcons name="check-circle" size={18} color="#30D158" />
+              <Text style={styles.successText}>{successMsg}</Text>
+            </View>
+          ) : null}
+
           {/* Form */}
           <View style={styles.form}>
-
             {/* Nome completo — apenas no cadastro */}
             {mode === "signup" && (
               <View style={styles.inputGroup}>
@@ -262,6 +433,15 @@ export default function LoginScreen() {
   );
 }
 
+function PlanFeature({ text }: { text: string }) {
+  return (
+    <View style={styles.featureRow}>
+      <MaterialIcons name="check-circle" size={18} color="#00D4AA" />
+      <Text style={styles.featureText}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: {
@@ -272,7 +452,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 32,
   },
   logo: {
     fontSize: 22,
@@ -351,6 +531,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 18,
   },
+  successBox: {
+    backgroundColor: "rgba(48,209,88,0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(48,209,88,0.25)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  successText: {
+    color: "#30D158",
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+    lineHeight: 18,
+  },
   submitBtn: {
     backgroundColor: "#00D4AA",
     borderRadius: 14,
@@ -384,5 +583,87 @@ const styles = StyleSheet.create({
     width: 40,
     height: 1,
     backgroundColor: "#2C2C2E",
+  },
+  // Paywall styles
+  planCard: {
+    backgroundColor: "#111111",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.3)",
+    marginBottom: 20,
+  },
+  planHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  planTitle: {
+    color: "#FFD700",
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  planPrice: {
+    color: "#FFFFFF",
+    fontSize: 42,
+    fontWeight: "800",
+    letterSpacing: -1,
+    marginBottom: 20,
+  },
+  planPeriod: {
+    color: "#8E8E93",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  planFeatures: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  featureText: {
+    color: "#ECEDEE",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  subscribeBtn: {
+    backgroundColor: "#00D4AA",
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  subscribeBtnText: {
+    color: "#0A0A0A",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  refreshBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  refreshBtnText: {
+    color: "#8E8E93",
+    fontSize: 13,
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  loadingText: {
+    color: "#8E8E93",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

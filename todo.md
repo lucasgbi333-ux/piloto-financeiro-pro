@@ -98,3 +98,11 @@
 - [x] Corrigir problema de cadastro no Supabase Auth
 - [x] Adicionar campo nome completo na tela de cadastro
 - [x] Botão de Logout no Dashboard para sair e voltar à tela de login
+- [x] Corrigir botão de Sair do app
+- [x] Stripe: instalar pacotes e configurar credenciais (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID)
+- [x] Stripe: criar tabela de assinaturas no Supabase (subscriptions)
+- [x] Stripe: endpoint de checkout no backend (criar sessão de pagamento)
+- [x] Stripe: webhook para receber eventos (checkout.completed, invoice.paid, invoice.payment_failed, subscription.deleted)
+- [x] Stripe: tela de paywall (bloquear acesso se ativo=false, mostrar botão Assinar)
+- [x] Stripe: controle de acesso no frontend (verificar status de assinatura após login)
+- [x] Stripe: mensagens pós-pagamento na tela de login (?success=true, ?canceled=true)
