@@ -55,6 +55,7 @@ export async function loadDailyRecords(): Promise<DailyRecord[]> {
     kmRodado: r.kmRodado,
     ganho: r.ganho,
     custo: r.custo,
+    vehicleType: (r as any).vehicleType ?? "COMBUSTAO",
     createdAt: r.createdAt ?? now,
     updatedAt: r.updatedAt ?? now,
   }));

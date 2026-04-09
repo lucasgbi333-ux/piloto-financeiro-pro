@@ -15,7 +15,7 @@ import type {
 } from "../types";
 
 // Helper para criar DailyRecord completo
-function makeDailyRecord(partial: { date: string; kmRodado: number; ganho: number; custo: number }): DailyRecord {
+function makeDailyRecord(partial: { date: string; kmRodado: number; ganho: number; custo: number; vehicleType?: "COMBUSTAO" | "ELETRICO" }): DailyRecord {
   const now = Date.now();
   return {
     id: `${partial.date}-test`,
@@ -23,6 +23,7 @@ function makeDailyRecord(partial: { date: string; kmRodado: number; ganho: numbe
     kmRodado: partial.kmRodado,
     ganho: partial.ganho,
     custo: partial.custo,
+    vehicleType: partial.vehicleType ?? "COMBUSTAO",
     createdAt: now,
     updatedAt: now,
   };

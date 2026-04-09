@@ -75,6 +75,7 @@ export default function OperationalScreen() {
       kmRodado: input.kmRodadoDia,
       ganho: input.ganhoDia,
       custo: result.custoTotalDiaReal,
+      vehicleType: input.tipoVeiculo,
       createdAt: now,
       updatedAt: now,
     });

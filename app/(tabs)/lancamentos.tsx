@@ -138,6 +138,7 @@ export default function LancamentosScreen() {
       kmRodado,
       ganho,
       custo: custoReal,
+      vehicleType: tipoVeiculo,
       createdAt: now,
       updatedAt: now,
     });
@@ -147,9 +148,9 @@ export default function LancamentosScreen() {
     setGastoAbastecimento(0);
   };
 
-  const handleDelete = (date: string) => {
+  const handleDelete = (date: string, vType: VehicleType) => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    removeDailyRecord(date);
+    removeDailyRecord(date, vType);
     setDetailDate(null);
   };
 
@@ -498,7 +499,7 @@ export default function LancamentosScreen() {
                   </Text>
                 </View>
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(detailRecord.date)} activeOpacity={0.8}>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(detailRecord.date, detailRecord.vehicleType)} activeOpacity={0.8}>
                     <Text style={styles.deleteBtnText}>Excluir</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.editBtn} onPress={() => {

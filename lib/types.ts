@@ -78,6 +78,8 @@ export interface DailyRecord {
   kmRodado: number;
   ganho: number;
   custo: number;
+  /** Tipo de veículo do lançamento — separa Combustão de Elétrico */
+  vehicleType: VehicleType;
   /** Timestamp de criação (ms) */
   createdAt: number;
   /** Timestamp da última atualização (ms) */

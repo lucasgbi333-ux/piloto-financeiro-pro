@@ -155,10 +155,18 @@ interface AppState {
   vehicleProfiles: VehicleProfile[];
   activeVehicleType: VehicleType;
   activeProfile: VehicleProfile;
+  /** Todos os registros diários (todos os perfis) */
   dailyRecords: DailyRecord[];
+  /** Registros filtrados por perfil Combustão */
+  dailyRecordsCombustao: DailyRecord[];
+  /** Registros filtrados por perfil Elétrico */
+  dailyRecordsEletrico: DailyRecord[];
   transactions: Transaction[];
   periodFilter: PeriodFilter;
   reports: ReportItem[];
+  /** Relatórios separados por perfil */
+  reportsCombustao: ReportItem[];
+  reportsEletrico: ReportItem[];
   dashboard: DashboardState;
   caixinha: CaixinhaState;
   loaded: boolean;
@@ -217,9 +225,13 @@ function buildInitialState(): AppState {
     activeVehicleType: activeType,
     activeProfile,
     dailyRecords: [],
+    dailyRecordsCombustao: [],
+    dailyRecordsEletrico: [],
     transactions: [],
     periodFilter: "DAY",
     reports: [],
+    reportsCombustao: [],
+    reportsEletrico: [],
     dashboard: computeDashboard(fixedResult, opResult, caixinha),
     caixinha,
     loaded: false,
@@ -244,7 +256,7 @@ type Action =
   | { type: "SET_ACTIVE_VEHICLE_TYPE"; vehicleType: VehicleType }
   | { type: "SAVE_VEHICLE_PROFILE"; profile: VehicleProfile }
   | { type: "ADD_DAILY_RECORD"; record: DailyRecord }
-  | { type: "DELETE_DAILY_RECORD"; date: string }
+  | { type: "DELETE_DAILY_RECORD"; date: string; vehicleType: VehicleType }
   | { type: "ADD_TRANSACTION"; transaction: Transaction }
   | { type: "SET_PERIOD_FILTER"; filter: PeriodFilter }
   | { type: "RESET_OPERATIONAL" }
@@ -266,6 +278,8 @@ function reducer(state: AppState, action: Action): AppState {
       const activeOpInput = opProfiles[activeType];
       const or2 = calculateOperationalCost(activeOpInput, activeProfile, fr.custoFixoDiario);
       const recs = action.records;
+      const recsCombustao = recs.filter((r) => r.vehicleType === "COMBUSTAO");
+      const recsEletrico = recs.filter((r) => r.vehicleType === "ELETRICO");
       const caixinha = buildCaixinhaState(action.caixinhaEntries, action.caixinhaConfig);
       const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
@@ -279,8 +293,12 @@ function reducer(state: AppState, action: Action): AppState {
         activeVehicleType: activeType,
         activeProfile,
         dailyRecords: recs,
+        dailyRecordsCombustao: recsCombustao,
+        dailyRecordsEletrico: recsEletrico,
         transactions: action.transactions,
         reports: groupReports(recs, state.periodFilter, fr.custoFixoDiario),
+        reportsCombustao: groupReports(recsCombustao, state.periodFilter, fr.custoFixoDiario),
+        reportsEletrico: groupReports(recsEletrico, state.periodFilter, fr.custoFixoDiario),
         dashboard: computeDashboard(fr, or2, caixinha, lastRecord),
         caixinha,
         loaded: true,
@@ -350,30 +368,44 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "ADD_DAILY_RECORD": {
       const recs = [...state.dailyRecords];
-      const idx = recs.findIndex((r) => r.date === action.record.date);
+      // Upsert por data+vehicleType: cada perfil pode ter um registro por data
+      const idx = recs.findIndex((r) => r.date === action.record.date && r.vehicleType === action.record.vehicleType);
       if (idx >= 0) {
         recs[idx] = { ...action.record, updatedAt: Date.now() };
       } else {
         recs.push(action.record);
       }
+      const recsCombustao = recs.filter((r) => r.vehicleType === "COMBUSTAO");
+      const recsEletrico = recs.filter((r) => r.vehicleType === "ELETRICO");
       const lastRecord = recs[recs.length - 1];
       return {
         ...state,
         dailyRecords: recs,
+        dailyRecordsCombustao: recsCombustao,
+        dailyRecordsEletrico: recsEletrico,
         reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        reportsCombustao: groupReports(recsCombustao, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        reportsEletrico: groupReports(recsEletrico, state.periodFilter, state.fixedCostResult.custoFixoDiario),
         dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, state.caixinha, lastRecord),
       };
     }
     case "DELETE_DAILY_RECORD": {
-      const recs = state.dailyRecords.filter((r) => r.date !== action.date);
+      // Remove por data+vehicleType para não apagar o registro do outro perfil na mesma data
+      const recs = state.dailyRecords.filter((r) => !(r.date === action.date && r.vehicleType === action.vehicleType));
+      const recsCombustao = recs.filter((r) => r.vehicleType === "COMBUSTAO");
+      const recsEletrico = recs.filter((r) => r.vehicleType === "ELETRICO");
       const newEntries = state.caixinha.entries.filter((e) => e.date !== action.date);
       const newCaixinha = buildCaixinhaState(newEntries, state.caixinha.config);
       const lastRecord = recs.length > 0 ? recs[recs.length - 1] : undefined;
       return {
         ...state,
         dailyRecords: recs,
+        dailyRecordsCombustao: recsCombustao,
+        dailyRecordsEletrico: recsEletrico,
         caixinha: newCaixinha,
         reports: groupReports(recs, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        reportsCombustao: groupReports(recsCombustao, state.periodFilter, state.fixedCostResult.custoFixoDiario),
+        reportsEletrico: groupReports(recsEletrico, state.periodFilter, state.fixedCostResult.custoFixoDiario),
         dashboard: computeDashboard(state.fixedCostResult, state.operationalResult, newCaixinha, lastRecord),
       };
     }
@@ -458,7 +490,7 @@ interface AppContextValue {
   setActiveVehicleType: (type: VehicleType) => void;
   saveVehicleProfileAction: (profile: VehicleProfile) => void;
   addDailyRecord: (record: DailyRecord) => void;
-  removeDailyRecord: (date: string) => void;
+  removeDailyRecord: (date: string, vehicleType: VehicleType) => void;
   addTransaction: (tx: Transaction) => void;
   setPeriodFilter: (filter: PeriodFilter) => void;
   recordDayWithTransactions: (record: DailyRecord) => void;
@@ -564,9 +596,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveDailyRecord(record);
   }, []);
 
-  const removeDailyRecord = useCallback((date: string) => {
-    dispatch({ type: "DELETE_DAILY_RECORD", date });
-    deleteDailyRecord(date);
+  const removeDailyRecord = useCallback((date: string, vehicleType: VehicleType) => {
+    dispatch({ type: "DELETE_DAILY_RECORD", date, vehicleType });
+    // Remove apenas o registro do perfil correto no storage
+    loadDailyRecords().then((recs) => {
+      const filtered = recs.filter((r) => !(r.date === date && r.vehicleType === vehicleType));
+      AsyncStorage.setItem("@piloto_daily_records", JSON.stringify(filtered));
+    });
     loadCaixinhaEntries().then((entries) => {
       const updated = entries.filter((e) => e.date !== date);
       saveCaixinhaEntries(updated);

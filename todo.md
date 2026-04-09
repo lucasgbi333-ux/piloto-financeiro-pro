@@ -81,3 +81,8 @@
 - [x] Corrigir rótulos dinâmicos: Combustível vs Recarga Elétrica em todas as telas
 - [x] Adicionar 4 testes unitários específicos para modo Elétrico (18 testes total)
 - [x] Modal de Lançamentos: replicar todas as informações e descrições da aba Operacional (paridade total)
+- [x] Perfis separados: DailyRecord com campo vehicleType (COMBUSTAO/ELETRICO)
+- [x] Contexto: lançamentos separados por perfil (dailyRecordsCombustao, dailyRecordsEletrico)
+- [x] Lançamentos: calendário e modal com dados isolados por perfil selecionado
+- [x] Dashboard: cards e métricas separadas para Combustão e Elétrico
+- [x] Histórico: filtro por perfil e dados separados por Combustão/Elétrico
