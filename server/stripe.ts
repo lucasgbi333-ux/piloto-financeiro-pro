@@ -243,6 +243,49 @@ export function registerStripeRoutes(app: Express) {
       res.status(500).json({ error: "Erro ao verificar assinatura" });
     }
   });
+
+  // ── POST /api/stripe/billing-portal-session ──
+  app.post("/api/stripe/billing-portal-session", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body as { email?: string };
+      if (!email) {
+        res.status(400).json({ error: "Email é obrigatório" });
+        return;
+      }
+
+      const stripe = getStripe();
+
+      // Get subscription from Supabase to find customer ID
+      const result = await supabaseAdmin("subscriptions", "GET", undefined, {
+        email: `eq.${email}`,
+        select: "stripe_customer_id",
+      });
+
+      if (!result || !Array.isArray(result) || result.length === 0) {
+        res.status(404).json({ error: "Nenhuma assinatura encontrada para este email" });
+        return;
+      }
+
+      const customerId = result[0].stripe_customer_id;
+      if (!customerId) {
+        res.status(400).json({ error: "Customer ID não encontrado" });
+        return;
+      }
+
+      // Create billing portal session
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: "pilotofinanceiro://settings",
+      });
+
+      console.log(`[Stripe] Billing portal session created for ${email} (customer: ${customerId})`);
+      res.json({ url: portalSession.url });
+    } catch (err: unknown) {
+      console.error("[Stripe] Billing portal session error:", err);
+      const message = err instanceof Error ? err.message : "Erro ao criar sessão do portal";
+      res.status(500).json({ error: message });
+    }
+  });
 }
 
 // ─── Webhook handler (needs raw body, registered separately) ───

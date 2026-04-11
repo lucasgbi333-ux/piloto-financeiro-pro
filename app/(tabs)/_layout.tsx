@@ -121,6 +121,16 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Configurações",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="gearshape.fill" color={color} />
+          ),
+        }}
+      />
+
       {/* Telas ocultas da tab bar */}
       <Tabs.Screen name="historico-chamadas" options={{ href: null }} />
       <Tabs.Screen name="vehicle-profiles" options={{ href: null }} />

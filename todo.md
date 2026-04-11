@@ -145,3 +145,7 @@
 - [x] Criar listener de URL com Linking.addEventListener no root layout
 - [x] Criar componente LoadingOverlay premium com CircularProgress
 - [x] Integrar listener e loading state na tela checkout-success
+- [x] Criar endpoint /api/stripe/billing-portal-session no servidor
+- [x] Localizar ou criar tela de Configurações do app
+- [x] Adicionar botão "Gerenciar Assinatura" com estilo Premium Dark/OLED
+- [x] Implementar lógica para abrir portal via WebBrowser.openBrowserAsync
