@@ -20,20 +20,29 @@ export default function SettingsScreen() {
 
   const handleManageSubscription = async () => {
     try {
-      if (!session?.user?.email) {
-        Alert.alert("Erro", "Email não encontrado. Faça login novamente.");
+      if (!session?.user) {
+        Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
         return;
       }
 
       setLoading(true);
       const apiBase = getApiBaseUrl();
 
+      // Get the session token for authentication
+      const token = session.access_token;
+      if (!token) {
+        Alert.alert("Erro", "Token de autenticação não encontrado.");
+        return;
+      }
+
       // Chama o endpoint para criar uma sessão do Stripe Billing Portal
       const res = await fetch(`${apiBase}/api/stripe/billing-portal-session`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         credentials: "include",
-        body: JSON.stringify({ email: session.user.email }),
       });
 
       if (!res.ok) {

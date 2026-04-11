@@ -247,11 +247,38 @@ export function registerStripeRoutes(app: Express) {
   // ── POST /api/stripe/billing-portal-session ──
   app.post("/api/stripe/billing-portal-session", async (req: Request, res: Response) => {
     try {
-      const { email } = req.body as { email?: string };
-      if (!email) {
-        res.status(400).json({ error: "Email é obrigatório" });
+      // Extract authorization token from headers
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({ error: "Não autorizado" });
         return;
       }
+
+      const token = authHeader.substring(7);
+
+      // Verify token with Supabase
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!userRes.ok) {
+        res.status(401).json({ error: "Token inválido ou expirado" });
+        return;
+      }
+
+      const user = (await userRes.json()) as { email?: string };
+      const authenticatedEmail = user.email;
+
+      if (!authenticatedEmail) {
+        res.status(401).json({ error: "Email não encontrado no token" });
+        return;
+      }
+
+      // Use authenticated email from token
+      const email = authenticatedEmail;
 
       const stripe = getStripe();
 

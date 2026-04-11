@@ -149,3 +149,6 @@
 - [x] Localizar ou criar tela de Configurações do app
 - [x] Adicionar botão "Gerenciar Assinatura" com estilo Premium Dark/OLED
 - [x] Implementar lógica para abrir portal via WebBrowser.openBrowserAsync
+- [x] Remover aba Radar de Ganhos do tab layout
+- [x] Adicionar autenticação ao endpoint /api/stripe/billing-portal-session
+- [x] Corrigir ação do botão "Gerenciar Assinatura" na tela Settings
