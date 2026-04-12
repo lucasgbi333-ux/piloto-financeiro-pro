@@ -4,7 +4,7 @@
  * Tela de configurações do Piloto Financeiro Pro.
  * Inclui botão "Gerenciar Assinatura" para acessar o Stripe Billing Portal.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScrollView, View, Text, Pressable, StyleSheet, ActivityIndicator, Alert, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -25,6 +25,28 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchTrialDays = async () => {
+      if (!session?.access_token) return;
+      try {
+        const apiBase = getApiBaseUrl();
+        const res = await fetch(`${apiBase}/api/stripe/trial-days-remaining`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTrialDaysRemaining(data.daysRemaining);
+        }
+      } catch (err) {
+        console.error("[Settings] Trial days error:", err);
+      }
+    };
+    fetchTrialDays();
+  }, [session?.access_token]);
   
   const isEmailValid = email.length > 0 && isValidEmail(email);
 
@@ -158,6 +180,16 @@ export default function SettingsScreen() {
           <Text style={[styles.subscriptionDescription, { color: colors.muted }]}>
             Altere seu plano, atualize seu método de pagamento ou cancele sua assinatura.
           </Text>
+
+          {/* Trial expiration warning */}
+          {trialDaysRemaining !== null && trialDaysRemaining > 0 && (
+            <View style={[styles.trialWarning, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+              <MaterialIcons name="info" size={18} color={colors.primary} style={styles.trialWarningIcon} />
+              <Text style={[styles.trialWarningText, { color: colors.foreground }]}>
+                Seu período de teste expira em {trialDaysRemaining} {trialDaysRemaining === 1 ? 'dia' : 'dias'}.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* About Section */}
@@ -266,5 +298,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     fontWeight: "500",
+  },
+  trialWarning: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  trialWarningIcon: {
+    marginRight: 4,
+  },
+  trialWarningText: {
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
   },
 });

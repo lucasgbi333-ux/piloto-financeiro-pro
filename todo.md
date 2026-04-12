@@ -162,3 +162,9 @@
 - [x] Remover e-mail pré-preenchido da sessão
 - [x] Deixar campo de e-mail vazio para entrada manual
 - [x] Verificar posicionamento do ícone de engrenagem no header
+- [x] Adicionar coluna trial_started_at na tabela subscriptions
+- [x] Criar função backend para calcular dias restantes de trial
+- [x] Remover exigência de Stripe no cadastro
+- [x] Criar trial automático de 7 dias para novos usuários
+- [x] Atualizar paywall: bloquear acesso se trial expirou
+- [x] Adicionar aviso de expiração na tela de Configurações

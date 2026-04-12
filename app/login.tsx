@@ -147,6 +147,22 @@ export default function LoginScreen() {
     }
   };
 
+  const handleStartTrial = async () => {
+    setCheckoutLoading(true);
+    setErrorMsg("");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      await checkSubscription();
+      hapticSuccess();
+    } catch {
+      setErrorMsg("Erro ao iniciar trial. Tente novamente.");
+      hapticError();
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
 
 
   const switchMode = (newMode: Mode) => {
@@ -206,10 +222,10 @@ export default function LoginScreen() {
               <PlanFeature text="Custos fixos e cálculo de lucro" />
             </View>
 
-            {/* Subscribe Button */}
+            {/* Subscribe Button - Trial without Stripe */}
             <TouchableOpacity
               style={styles.subscribeBtn}
-              onPress={handleCheckout}
+              onPress={handleStartTrial}
               activeOpacity={0.8}
               disabled={checkoutLoading}
             >
