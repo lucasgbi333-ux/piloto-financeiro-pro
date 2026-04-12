@@ -5,7 +5,7 @@
  * Inclui botão "Gerenciar Assinatura" para acessar o Stripe Billing Portal.
  */
 import { useState } from "react";
-import { ScrollView, View, Text, Pressable, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { ScrollView, View, Text, Pressable, StyleSheet, ActivityIndicator, Alert, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
@@ -13,13 +13,36 @@ import { getApiBaseUrl } from "@/constants/oauth";
 import * as WebBrowser from "expo-web-browser";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
+// Validar formato de e-mail
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 export default function SettingsScreen() {
   const colors = useColors();
   const { session } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState(session?.user?.email || "");
+  const [emailError, setEmailError] = useState("");
+  
+  const isEmailValid = email.length > 0 && isValidEmail(email);
 
   const handleManageSubscription = async () => {
     try {
+      // Validar e-mail digitado
+      if (!email.trim()) {
+        setEmailError("Digite um e-mail");
+        return;
+      }
+      
+      if (!isValidEmail(email)) {
+        setEmailError("E-mail inválido");
+        return;
+      }
+      
+      setEmailError("");
+      
       if (!session?.user) {
         Alert.alert("Erro", "Sessão não encontrada. Faça login novamente.");
         return;
@@ -35,19 +58,20 @@ export default function SettingsScreen() {
         return;
       }
 
-      // Chama o endpoint para criar uma sessão do Stripe Billing Portal
+      // Chama o endpoint para criar uma sessão do Stripe Billing Portal com o e-mail digitado
       const res = await fetch(`${apiBase}/api/stripe/billing-portal-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ email }),
         credentials: "include",
       });
 
       if (!res.ok) {
         const error = await res.json();
-        Alert.alert("Erro", error.error || "Não foi possível acessar o portal de assinatura");
+        Alert.alert("Erro", error.error || "Não foi possível acessar o portal de assinatura. Verifique o e-mail.");
         return;
       }
 
@@ -80,15 +104,42 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Assinatura</Text>
 
+          {/* Email Input Field */}
+          <View style={styles.emailContainer}>
+            <TextInput
+              style={[
+                styles.emailInput,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.foreground,
+                  borderColor: emailError ? colors.error : colors.border,
+                },
+              ]}
+              placeholder="Digite seu e-mail de assinante"
+              placeholderTextColor={colors.muted}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (emailError) setEmailError("");
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!loading}
+            />
+            {emailError ? (
+              <Text style={[styles.errorText, { color: colors.error }]}>{emailError}</Text>
+            ) : null}
+          </View>
+
           {/* Manage Subscription Button */}
           <Pressable
             onPress={handleManageSubscription}
-            disabled={loading}
+            disabled={loading || !isEmailValid}
             style={({ pressed }) => [
               styles.subscriptionButton,
               {
-                backgroundColor: colors.primary,
-                opacity: pressed || loading ? 0.8 : 1,
+                backgroundColor: isEmailValid ? colors.primary : colors.muted,
+                opacity: pressed || loading || !isEmailValid ? 0.6 : 1,
               },
             ]}
           >
@@ -197,6 +248,22 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 14,
+    fontWeight: "500",
+  },
+  emailContainer: {
+    marginBottom: 16,
+  },
+  emailInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 6,
     fontWeight: "500",
   },
 });

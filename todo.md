@@ -155,3 +155,7 @@
 - [x] Remover arquivo radar-ganhos.tsx completamente
 - [x] Remover contexto RadarGanhos e provider
 - [x] Adicionar ícone de engrenagem na tela Settings
+- [x] Transformar campo de e-mail em TextField editável
+- [x] Adicionar validação de formato de e-mail
+- [x] Integrar e-mail do TextField com botão "Gerenciar Assinatura"
+- [x] Adicionar placeholder e feedback visual
