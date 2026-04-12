@@ -159,3 +159,6 @@
 - [x] Adicionar validação de formato de e-mail
 - [x] Integrar e-mail do TextField com botão "Gerenciar Assinatura"
 - [x] Adicionar placeholder e feedback visual
+- [x] Remover e-mail pré-preenchido da sessão
+- [x] Deixar campo de e-mail vazio para entrada manual
+- [x] Verificar posicionamento do ícone de engrenagem no header

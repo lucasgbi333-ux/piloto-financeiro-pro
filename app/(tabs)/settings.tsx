@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const { session } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState(session?.user?.email || "");
+  const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   
   const isEmailValid = email.length > 0 && isValidEmail(email);
@@ -185,15 +185,16 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 24,
     borderBottomWidth: 1,
     borderBottomColor: "#1E2022",
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
+    justifyContent: "center",
     gap: 12,
   },
   headerIcon: {
-    marginRight: 8,
+    marginBottom: 4,
   },
   headerTitle: {
     fontSize: 28,
