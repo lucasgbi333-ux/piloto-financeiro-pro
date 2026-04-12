@@ -313,67 +313,6 @@ export function registerStripeRoutes(app: Express) {
       res.status(500).json({ error: message });
     }
   });
-
-  // Trial days remaining endpoint
-  app.get("/api/stripe/trial-days-remaining", async (req: Request, res: Response) => {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        res.status(401).json({ error: "Não autorizado" });
-        return;
-      }
-
-      const token = authHeader.substring(7);
-      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          apikey: SUPABASE_SERVICE_KEY,
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!userRes.ok) {
-        res.status(401).json({ error: "Token inválido" });
-        return;
-      }
-
-      const user = (await userRes.json()) as { email?: string };
-      const email = user.email;
-      if (!email) {
-        res.status(401).json({ error: "Email não encontrado" });
-        return;
-      }
-
-      const result = await supabaseAdmin("subscriptions", "GET", undefined, {
-        email: `eq.${email}`,
-        select: "trial_started_at,ativo",
-      });
-
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        res.json({ daysRemaining: 0, isTrialActive: false });
-        return;
-      }
-
-      const subscription = result[0];
-      const trialStartedAt = subscription.trial_started_at;
-      const isActive = subscription.ativo;
-
-      if (!trialStartedAt) {
-        res.json({ daysRemaining: 0, isTrialActive: false });
-        return;
-      }
-
-      const startDate = new Date(trialStartedAt);
-      const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const now = new Date();
-      const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
-      const isTrialActive = daysRemaining > 0 && isActive;
-
-      res.json({ daysRemaining, isTrialActive });
-    } catch (err: unknown) {
-      console.error("[Stripe] Trial error:", err);
-      res.status(500).json({ error: "Erro ao calcular dias" });
-    }
-  });
 }
 
 // ─── Webhook handler (needs raw body, registered separately) ───

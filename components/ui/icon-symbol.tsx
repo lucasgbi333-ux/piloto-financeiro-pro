@@ -34,7 +34,6 @@ const MAPPING = {
   "steeringwheel": "drive-eta",
   "banknote.fill": "savings",
   "antenna.radiowaves.left.and.right": "radar",
-  "gearshape.fill": "settings",
 } as IconMapping;
 
 export function IconSymbol({

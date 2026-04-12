@@ -172,21 +172,6 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
     // Se a sessão foi criada automaticamente (email confirmation desabilitado no Supabase)
     if (data.session) {
-      // Criar trial automático de 7 dias
-      try {
-        await supabase.from("subscriptions").upsert(
-          {
-            email,
-            ativo: true,
-            plano: "trial",
-            trial_started_at: new Date().toISOString(),
-          },
-          { onConflict: "email" }
-        );
-        console.log("[Auth] Trial criado para", email);
-      } catch (err) {
-        console.error("[Auth] Erro ao criar trial:", err);
-      }
       return { error: null, needsConfirmation: false };
     }
 
