@@ -152,3 +152,6 @@
 - [x] Remover aba Radar de Ganhos do tab layout
 - [x] Adicionar autenticação ao endpoint /api/stripe/billing-portal-session
 - [x] Corrigir ação do botão "Gerenciar Assinatura" na tela Settings
+- [x] Remover arquivo radar-ganhos.tsx completamente
+- [x] Remover contexto RadarGanhos e provider
+- [x] Adicionar ícone de engrenagem na tela Settings

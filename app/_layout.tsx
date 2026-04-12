@@ -9,7 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AppProvider } from "@/lib/app-context";
-import { RadarGanhosProvider } from "@/lib/radar-ganhos-context";
+
 import { SupabaseAuthProvider } from "@/lib/supabase-auth-provider";
 import {
   SafeAreaFrameContext,
@@ -103,7 +103,6 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SupabaseAuthProvider>
       <AppProvider>
-      <RadarGanhosProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <StripeRedirectHandler />
@@ -117,7 +116,6 @@ export default function RootLayout() {
           <StatusBar style="auto" />
         </QueryClientProvider>
       </trpc.Provider>
-      </RadarGanhosProvider>
       </AppProvider>
       </SupabaseAuthProvider>
     </GestureHandlerRootView>

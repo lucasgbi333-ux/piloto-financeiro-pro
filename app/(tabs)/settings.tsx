@@ -72,6 +72,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
+          <MaterialIcons name="settings" size={24} color={colors.primary} style={styles.headerIcon} />
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Configurações</Text>
         </View>
 
@@ -136,6 +137,12 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#1E2022",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerIcon: {
+    marginRight: 8,
   },
   headerTitle: {
     fontSize: 28,
