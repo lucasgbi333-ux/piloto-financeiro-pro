@@ -21,7 +21,7 @@ const isValidEmail = (email: string): boolean => {
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { session } = useSupabaseAuth();
+  const { session, trial } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -160,6 +160,22 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
+        {/* Trial Status Section */}
+        {trial.is_active && trial.days_remaining > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.background }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Período de Teste</Text>
+            <View style={[styles.trialInfo, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+              <MaterialIcons name="schedule" size={24} color={colors.primary} style={styles.trialIcon} />
+              <View style={styles.trialContent}>
+                <Text style={[styles.trialDays, { color: colors.primary }]}>{trial.days_remaining} dias restantes</Text>
+                <Text style={[styles.trialDate, { color: colors.muted }]}>
+                  Expira em {trial.trial_end ? new Date(trial.trial_end).toLocaleDateString("pt-BR") : "—"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* About Section */}
         <View style={[styles.section, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Sobre</Text>
@@ -266,5 +282,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     fontWeight: "500",
+  },
+  trialInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 12,
+  },
+  trialIcon: {
+    marginRight: 4,
+  },
+  trialContent: {
+    flex: 1,
+  },
+  trialDays: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  trialDate: {
+    fontSize: 13,
   },
 });

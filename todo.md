@@ -162,3 +162,14 @@
 - [x] Remover e-mail pré-preenchido da sessão
 - [x] Deixar campo de e-mail vazio para entrada manual
 - [x] Verificar posicionamento do ícone de engrenagem no header
+- [x] Atualizar schema do Supabase: adicionar campos trial_start, trial_end, is_active na tabela users
+- [x] Implementar lógica de criação de usuário com trial automático (7 dias)
+- [x] Criar endpoint backend /api/trial/check para validar status do trial
+- [x] Criar endpoint backend /api/trial/extend para estender trial se necessário
+- [x] Modificar fluxo de autenticação: remover obrigatoriedade de cartão no cadastro
+- [x] Implementar validação de trial ao abrir o app (verificar se data atual <= trial_end)
+- [x] Criar tela de bloqueio após expiração do trial com botão "Assinar agora"
+- [x] Integrar Stripe apenas após expiração do trial (mostrar paywall com checkout)
+- [x] Adicionar contador de dias restantes do trial na tela de Configurações
+- [x] Testar fluxo completo: cadastro → 7 dias de acesso → bloqueio → Stripe
+- [x] Salvar checkpoint v6.0 com trial de 7 dias implementado

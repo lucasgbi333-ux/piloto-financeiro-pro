@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
 import { getApiBaseUrl } from "@/constants/oauth";
@@ -9,17 +9,27 @@ interface SubscriptionStatus {
   plano: string | null;
 }
 
+interface TrialStatus {
+  has_trial: boolean;
+  is_active: boolean;
+  days_remaining: number;
+  trial_end: string | null;
+}
+
 interface SupabaseAuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
   subscription: SubscriptionStatus;
   subscriptionLoading: boolean;
+  trial: TrialStatus;
+  trialLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   checkSubscription: () => Promise<void>;
+  checkTrial: () => Promise<void>;
   createCheckout: () => Promise<{ url: string | null; error: string | null }>;
 }
 
@@ -30,6 +40,13 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus>({ ativo: false, plano: null });
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [trial, setTrial] = useState<TrialStatus>({
+    has_trial: false,
+    is_active: false,
+    days_remaining: 0,
+    trial_end: null,
+  });
+  const [trialLoading, setTrialLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -74,14 +91,71 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session?.user?.email]);
 
-  // Auto-check subscription when session changes
+  // Check trial status
+  const checkTrial = useCallback(async () => {
+    const email = session?.user?.email;
+    if (!email) {
+      setTrial({
+        has_trial: false,
+        is_active: false,
+        days_remaining: 0,
+        trial_end: null,
+      });
+      return;
+    }
+
+    setTrialLoading(true);
+    try {
+      const apiBase = getApiBaseUrl();
+      const res = await fetch(
+        `${apiBase}/api/trial/check?email=${encodeURIComponent(email)}`,
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setTrial({
+          has_trial: data.has_trial ?? false,
+          is_active: data.is_active ?? false,
+          days_remaining: data.days_remaining ?? 0,
+          trial_end: data.trial_end ?? null,
+        });
+      } else {
+        console.warn("[Auth] Failed to check trial:", res.status);
+        setTrial({
+          has_trial: false,
+          is_active: false,
+          days_remaining: 0,
+          trial_end: null,
+        });
+      }
+    } catch (err) {
+      console.error("[Auth] Trial check error:", err);
+      setTrial({
+        has_trial: false,
+        is_active: false,
+        days_remaining: 0,
+        trial_end: null,
+      });
+    } finally {
+      setTrialLoading(false);
+    }
+  }, [session?.user?.email]);
+
+  // Auto-check subscription and trial when session changes
   useEffect(() => {
     if (session?.user?.email) {
       checkSubscription();
+      checkTrial();
     } else {
       setSubscription({ ativo: false, plano: null });
+      setTrial({
+        has_trial: false,
+        is_active: false,
+        days_remaining: 0,
+        trial_end: null,
+      });
     }
-  }, [session?.user?.email, checkSubscription]);
+  }, [session?.user?.email, checkSubscription, checkTrial]);
 
   // Create Stripe checkout session
   const createCheckout = useCallback(async (): Promise<{ url: string | null; error: string | null }> => {
@@ -172,6 +246,18 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
     // Se a sessão foi criada automaticamente (email confirmation desabilitado no Supabase)
     if (data.session) {
+      // Create trial for new user
+      try {
+        const apiBase = getApiBaseUrl();
+        await fetch(`${apiBase}/api/trial/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, user_id: data.user?.id }),
+        });
+      } catch (err) {
+        console.error("[Auth] Failed to create trial:", err);
+      }
       return { error: null, needsConfirmation: false };
     }
 
@@ -198,6 +284,12 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
     setSession(null);
     setSubscription({ ativo: false, plano: null });
+    setTrial({
+      has_trial: false,
+      is_active: false,
+      days_remaining: 0,
+      trial_end: null,
+    });
   };
 
   return (
@@ -208,11 +300,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         loading,
         subscription,
         subscriptionLoading,
+        trial,
+        trialLoading,
         signIn,
         signUp,
         resetPassword,
         signOut,
         checkSubscription,
+        checkTrial,
         createCheckout,
       }}
     >

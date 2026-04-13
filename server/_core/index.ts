@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { registerStripeRoutes, registerStripeWebhook } from "../stripe";
+import { registerTrialRoutes } from "../trial";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -60,6 +61,7 @@ async function startServer() {
 
   registerOAuthRoutes(app);
   registerStripeRoutes(app);
+  registerTrialRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });

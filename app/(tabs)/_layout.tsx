@@ -13,7 +13,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
-  const { session, loading, subscription, subscriptionLoading } = useSupabaseAuth();
+  const { session, loading, subscription, subscriptionLoading, trial, trialLoading } = useSupabaseAuth();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -22,14 +22,17 @@ export default function TabLayout() {
     }
   }, [loading, session]);
 
-  // Redirect to login/paywall if not subscribed
+  // Redirect to login/paywall if not subscribed and no trial
   useEffect(() => {
-    if (!loading && session && !subscriptionLoading && !subscription.ativo) {
-      router.replace("/login");
+    if (!loading && session && !subscriptionLoading && !trialLoading) {
+      const hasAccess = subscription.ativo || trial.is_active;
+      if (!hasAccess) {
+        router.replace("/login");
+      }
     }
-  }, [loading, session, subscriptionLoading, subscription.ativo]);
+  }, [loading, session, subscriptionLoading, subscription.ativo, trialLoading, trial.is_active]);
 
-  if (loading || subscriptionLoading) {
+  if (loading || subscriptionLoading || trialLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0A0A0A" }}>
         <ActivityIndicator size="large" color="#00D4AA" />
@@ -38,7 +41,8 @@ export default function TabLayout() {
     );
   }
 
-  if (!session || !subscription.ativo) {
+  const hasAccess = subscription.ativo || trial.is_active;
+  if (!session || !hasAccess) {
     return null;
   }
 

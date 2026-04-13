@@ -6,13 +6,14 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
+import { getApiBaseUrl } from "@/constants/oauth";
 import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 type Mode = "login" | "signup" | "reset";
 
 export default function LoginScreen() {
-  const { signIn, signUp, resetPassword, signOut, session, subscription, subscriptionLoading, createCheckout, checkSubscription } = useSupabaseAuth();
+  const { signIn, signUp, resetPassword, signOut, session, subscription, subscriptionLoading, trial, trialLoading, createCheckout, checkSubscription, checkTrial } = useSupabaseAuth();
   const params = useLocalSearchParams<{ success?: string; canceled?: string }>();
 
   const [mode, setMode] = useState<Mode>("login");
@@ -43,12 +44,15 @@ export default function LoginScreen() {
     }
   }, [params.success, params.canceled]);
 
-  // If user is logged in and subscribed, go to app
+  // If user is logged in with trial or subscription, go to app
   useEffect(() => {
-    if (session && subscription.ativo && !subscriptionLoading) {
-      router.replace("/(tabs)");
+    if (session && !subscriptionLoading && !trialLoading) {
+      // Allow access if: has active subscription OR has active trial
+      if (subscription.ativo || trial.is_active) {
+        router.replace("/(tabs)");
+      }
     }
-  }, [session, subscription.ativo, subscriptionLoading]);
+  }, [session, subscription.ativo, subscriptionLoading, trial.is_active, trialLoading]);
 
   const isValid = (() => {
     if (mode === "reset") return email.trim().length > 0;
@@ -119,6 +123,44 @@ export default function LoginScreen() {
       hapticError();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartTrial = async () => {
+    setCheckoutLoading(true);
+    setErrorMsg("");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      const apiBase = getApiBaseUrl();
+      const email = session?.user?.email;
+      if (!email) {
+        setErrorMsg("Email não encontrado. Faça login novamente.");
+        return;
+      }
+
+      const res = await fetch(`${apiBase}/api/trial/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, user_id: session?.user?.id }),
+      });
+
+      if (res.ok) {
+        hapticSuccess();
+        // Refresh trial status
+        await checkTrial();
+        // Auto-redirect will happen via useEffect
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error || "Erro ao iniciar trial");
+        hapticError();
+      }
+    } catch (err) {
+      setErrorMsg("Erro de conexão. Verifique sua internet.");
+      hapticError();
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -206,10 +248,10 @@ export default function LoginScreen() {
               <PlanFeature text="Custos fixos e cálculo de lucro" />
             </View>
 
-            {/* Subscribe Button */}
+            {/* Trial Button */}
             <TouchableOpacity
               style={styles.subscribeBtn}
-              onPress={handleCheckout}
+              onPress={handleStartTrial}
               activeOpacity={0.8}
               disabled={checkoutLoading}
             >
