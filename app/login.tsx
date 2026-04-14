@@ -127,44 +127,8 @@ export default function LoginScreen() {
   };
 
   const handleStartTrial = async () => {
-    setCheckoutLoading(true);
-    setErrorMsg("");
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    try {
-      const apiBase = getApiBaseUrl();
-      const email = session?.user?.email;
-      if (!email) {
-        setErrorMsg("Email não encontrado. Faça login novamente.");
-        return;
-      }
-
-      const res = await fetch(`${apiBase}/api/trial/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, user_id: session?.user?.id }),
-      });
-
-      if (res.ok) {
-        hapticSuccess();
-        // Refresh trial status
-        await checkTrial();
-        // Auto-redirect will happen via useEffect
-      } else {
-        const data = await res.json().catch(() => ({}));
-        // Mostrar erro detalhado do Supabase
-        const detailedError = data.error || "Erro ao iniciar trial";
-        const fullError = data.details ? `${detailedError} - ${JSON.stringify(data.details)}` : detailedError;
-        setErrorMsg(fullError);
-        hapticError();
-      }
-    } catch (err) {
-      setErrorMsg("Erro de conexão. Verifique sua internet.");
-      hapticError();
-    } finally {
-      setCheckoutLoading(false);
-    }
+    // "7 dias grátis" redireciona direto para o Stripe (igual versão 1.0.14)
+    await handleCheckout();
   };
 
   const handleCheckout = async () => {
