@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{ success?: string; canceled?: string }>();
 
   const [mode, setMode] = useState<Mode>("login");
-  const [fullName, setFullName] = useState("");
+  // const [fullName, setFullName] = useState(""); // Removido - não é necessário
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,7 +28,7 @@ export default function LoginScreen() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState("");
 
-  const nameRef = useRef<TextInput>(null);
+  // const nameRef = useRef<TextInput>(null); // Removido
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -56,7 +56,7 @@ export default function LoginScreen() {
 
   const isValid = (() => {
     if (mode === "reset") return email.trim().length > 0;
-    if (mode === "signup") return fullName.trim().length > 0 && email.trim().length > 0 && password.length >= 6;
+    if (mode === "signup") return email.trim().length > 0 && password.length >= 6;
     return email.trim().length > 0 && password.length >= 6;
   })();
 
@@ -88,7 +88,7 @@ export default function LoginScreen() {
         }
 
       } else if (mode === "signup") {
-        const { error, needsConfirmation } = await signUp(email.trim(), password, fullName.trim());
+        const { error, needsConfirmation } = await signUp(email.trim(), password, "");
         if (error) {
           setErrorMsg(error);
           hapticError();
@@ -153,7 +153,10 @@ export default function LoginScreen() {
         // Auto-redirect will happen via useEffect
       } else {
         const data = await res.json().catch(() => ({}));
-        setErrorMsg(data.error || "Erro ao iniciar trial");
+        // Mostrar erro detalhado do Supabase
+        const detailedError = data.error || "Erro ao iniciar trial";
+        const fullError = data.details ? `${detailedError} - ${JSON.stringify(data.details)}` : detailedError;
+        setErrorMsg(fullError);
         hapticError();
       }
     } catch (err) {
@@ -196,7 +199,7 @@ export default function LoginScreen() {
     setErrorMsg("");
     setSuccessMsg("");
     setPassword("");
-    setFullName("");
+    // setFullName(""); // Removido
   };
 
   const handlePaywallLogout = async () => {
@@ -368,26 +371,7 @@ export default function LoginScreen() {
 
           {/* Form */}
           <View style={styles.form}>
-            {/* Nome completo — apenas no cadastro */}
-            {mode === "signup" && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nome Completo</Text>
-                <TextInput
-                  ref={nameRef}
-                  style={styles.input}
-                  placeholder="Seu nome completo"
-                  placeholderTextColor="#555"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  autoComplete="name"
-                  value={fullName}
-                  onChangeText={(t) => { setFullName(t); setErrorMsg(""); }}
-                  returnKeyType="next"
-                  onSubmitEditing={() => emailRef.current?.focus()}
-                  editable={!loading}
-                />
-              </View>
-            )}
+            {/* Campo de nome removido - apenas email e senha */}
 
             {/* Email */}
             <View style={styles.inputGroup}>
