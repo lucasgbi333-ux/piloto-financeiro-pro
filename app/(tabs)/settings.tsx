@@ -11,6 +11,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useSupabaseAuth } from "@/lib/supabase-auth-provider";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 // Validar formato de e-mail
@@ -189,6 +190,18 @@ export default function SettingsScreen() {
             <Text style={[styles.infoLabel, { color: colors.muted }]}>Email</Text>
             <Text style={[styles.infoValue, { color: colors.foreground }]}>{session?.user?.email || "—"}</Text>
           </View>
+
+          {/* Privacy Policy Link */}
+          <Pressable
+            onPress={() => router.push("/privacy-policy")}
+            style={({ pressed }) => [styles.privacyLink, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <View style={styles.privacyLinkContent}>
+              <MaterialIcons name="privacy-tip" size={20} color={colors.primary} />
+              <Text style={[styles.privacyLinkText, { color: colors.primary }]}>Política de Privacidade</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+          </Pressable>
         </View>
 
         {/* Footer Spacer */}
@@ -304,5 +317,21 @@ const styles = StyleSheet.create({
   },
   trialDate: {
     fontSize: 13,
+  },
+  privacyLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 0,
+  },
+  privacyLinkContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  privacyLinkText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
