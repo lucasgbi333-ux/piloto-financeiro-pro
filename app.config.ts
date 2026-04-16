@@ -42,10 +42,11 @@ const env = {
   androidPackage: "com.lucas.pilotofinanceiro", // Package name exclusivo para produção
 };
 
-const config: ExpoConfig = {
+const config: ExpoConfig & { projectId?: string } = {
   name: env.appName,
   slug: env.appSlug,
   version: "1.0.14",
+  projectId: "jwJXudXaFFHWrafMZSS4a7",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: [env.scheme, env.customScheme],
@@ -68,7 +69,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE"],
     intentFilters: [
       {
         action: "VIEW",
@@ -106,19 +107,6 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
-      },
-    ],
-    [
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",
@@ -136,11 +124,11 @@ const config: ExpoConfig = {
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
+          targetSdkVersion: 35,
+          compileSdkVersion: 35,
         },
       },
     ],
-    // Config plugin para permissões do Radar de Ganhos (overlay + accessibility)
-    "./plugins/withRadarOverlay",
   ],
   experiments: {
     typedRoutes: true,
