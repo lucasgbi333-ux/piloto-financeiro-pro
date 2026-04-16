@@ -69,7 +69,7 @@ const config: ExpoConfig & { projectId?: string } = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE"],
+    permissions: ["POST_NOTIFICATIONS", "INTERNET"],
     intentFilters: [
       {
         action: "VIEW",
